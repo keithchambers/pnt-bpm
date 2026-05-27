@@ -1,58 +1,67 @@
-# pnt-cli
+<div align="center">
+  <h1>pnt-cli</h1>
+  <p><strong>Batch tempo-change audio files with Serato Pitch n' Time LE — no DAW required</strong></p>
 
-Batch tempo-change audio files with Serato Pitch n' Time LE — no DAW required.
+  <p>
+    <a href="https://github.com/keithchambers/pnt-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/keithchambers/pnt-cli/ci.yml?branch=main&label=build" alt="Build Status"></a>
+    <a href="https://github.com/keithchambers/pnt-cli/releases/latest"><img src="https://img.shields.io/github/v/release/keithchambers/pnt-cli?label=release" alt="Latest release"></a>
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey" alt="Platform: macOS 13+">
+  </p>
+</div>
 
-## Requirements
+## Overview
 
-- macOS 13 or newer
-- Serato Pitch n' Time LE installed
+Serato Pitch n' Time is the industry-standard pitch-shifting and time-stretching plugin for producers and DJs. It
+changes a track's tempo while preserving its pitch, avoiding the artifacts that cheaper time-stretch algorithms
+introduce. Serato ships Pitch n' Time as a plugin that only loads inside Logic Pro and Pro Tools, which turns one-off
+tempo changes into a multi-step ritual: launch a DAW, create a session, load the plugin, set the tempo, bounce,
+repeat.
 
-## Install
+`pnt-cli` brings Pitch n' Time LE to the command line. It hosts the locally installed Pitch n' Time Audio Unit
+directly from a terminal, so a track — or a folder of tracks — can be rendered to one or more target BPMs in a single
+command. Source metadata and artwork are copied to each output, and the BPM tag is updated to match the target.
 
-Download [pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg) and open it.
+`pnt-cli` is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Serato, and
+does not include Pitch n' Time — install and license Pitch n' Time LE separately.
 
-Verify:
+## Installation
+
+**Requirements:** macOS 13 or newer, with Serato Pitch n' Time LE installed locally.
+
+Download the latest signed installer and open it:
+
+[pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
+
+Verify the install:
 
 ```sh
 pnt-cli --help
 ```
 
-If Pitch n' Time LE isn't installed, the help is followed by a warning and `pnt-cli` exits 1.
+If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning and
+exits with status 1.
 
-## Usage
+## Quick Start
+
+Render one input to multiple target BPMs:
 
 ```sh
 pnt-cli song.wav --source 120 --target 125,128
+# writes song_125bpm.wav and song_128bpm.wav next to the input
 ```
 
-Renders `song_125bpm.wav` and `song_128bpm.wav` next to the input. Every input is rendered at every target, so multiple inputs fan out:
+Render multiple inputs to multiple targets in a single batch — every input is rendered at every target:
 
 ```sh
-pnt-cli a.wav b.aiff --source 120 --target 125,128   # 4 renders
+pnt-cli vocals.wav drums.wav bass.wav --source 126 --target 120,124,128 -d renders/
+# 3 inputs × 3 targets = 9 renders, all written to ./renders/
 ```
 
-Output files keep the input's file format and live next to the input unless `--out-dir` is set.
+Let `pnt-cli` auto-detect the source BPM from Beatport ID3 tags or filename slots:
 
-If `--source` is omitted, `pnt-cli` auto-detects the source BPM from Beatport ID3 tags or filename slots (`..._(Mix)__<BPM>__<Key>.aiff`). If no source is detectable, `pnt-cli` errors out — pass `--source <BPM>` to be explicit.
+```sh
+pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
+# detects 125 BPM from the filename, then renders one file at 128 BPM
+```
 
-## Flags
-
-| Flag | Description |
-| --- | --- |
-| `-t, --target <BPM[,BPM...]>` | Target BPM(s). Required. Comma-separated or repeated. |
-| `-i, --input <FILE>` | Input file. Can be repeated. Combined with positional inputs. |
-| `-s, --source <BPM>` | Source BPM. Defaults to auto-detect. |
-| `-d, --out-dir <DIR>` | Output directory. Defaults to input's directory. |
-| `--overwrite` | Replace existing files. |
-| `-h, --help` | Show help. |
-| `-v, --version` | Show version. |
-
-## Notes
-
-- Outputs keep the input's sample rate, channel count, and file format.
-- Source metadata and artwork are copied to outputs; the BPM tag is updated to the target BPM.
-- MP3 inputs are rejected. Use WAV, AIFF, CAF, or M4A.
-
-## Disclaimer
-
-`pnt-cli` is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Serato, and does not include Serato Pitch n' Time — install and license Serato Pitch n' Time LE separately.
+Outputs keep the input's file format, sample rate, and channel count.
