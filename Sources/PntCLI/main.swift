@@ -2,13 +2,6 @@ import Darwin
 import Foundation
 import PntCliCore
 
-private let pntMissingWarning = """
-
-⚠  Serato Pitch n' Time LE is not installed (or not loadable).
-   pnt-cli needs the Pitch n' Time LE Audio Unit to render audio.
-   Install Pitch n' Time LE from Serato, then run `pnt-cli --help` again to confirm.
-"""
-
 func resolveSources(for inputs: [URL], explicit: BPM?) throws -> [(URL, BPM)] {
     if let explicit {
         return inputs.map { ($0, explicit) }
@@ -109,18 +102,9 @@ func run() throws {
 
     case .help:
         print(helpText)
-        if !PitchNTimeAudioUnit.isAvailable() {
-            fputs(pntMissingWarning + "\n", stderr)
-            exit(1)
-        }
         return
 
     case .render(let options):
-        guard PitchNTimeAudioUnit.isAvailable() else {
-            print(helpText)
-            fputs(pntMissingWarning + "\n", stderr)
-            exit(1)
-        }
         try runRender(options)
     }
 }

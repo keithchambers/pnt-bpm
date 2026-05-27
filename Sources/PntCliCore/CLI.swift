@@ -88,7 +88,7 @@ public struct CLIParser {
                 targetRaw.append(try popValue(after: arg))
             case "-d", "--out-dir":
                 outDirPath = try popValue(after: arg)
-            case "--overwrite":
+            case "-o", "--overwrite":
                 overwrite = true
             default:
                 if arg.hasPrefix("-") {
@@ -178,7 +178,7 @@ OUTPUT:
   -d, --out-dir <DIR>
       Output directory. Defaults to the input file directory.
 
-  --overwrite
+  -o, --overwrite
       Replace existing files.
 
   Rendered targets automatically copy source track metadata and artwork.

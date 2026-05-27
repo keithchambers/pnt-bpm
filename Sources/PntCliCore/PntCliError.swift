@@ -42,11 +42,11 @@ public enum PntCliError: Error, CustomStringConvertible, Equatable {
         case .metadataCopyFailed(let source, let target, let reason):
             return "could not copy metadata from \(source.lastPathComponent) to \(target.lastPathComponent): \(reason)"
         case .audioUnitNotFound:
-            return "Serato Pitch n Time LE Audio Unit was not found"
+            return "Serato Pitch n Time LE could not be loaded while processing audio. Install Serato Pitch n Time LE 3.1.1, make sure it is authorized in a DAW or Audio Unit host, then try again."
         case .audioUnitInstantiateFailed(let reason):
-            return "could not load Serato Pitch n Time LE: \(reason)"
+            return "Serato Pitch n Time LE failed to load while processing audio: \(reason). Make sure it is installed, authorized, and valid in macOS Audio Units, then try again."
         case .missingAudioUnitParameter(let name):
-            return "Serato Pitch n Time LE is missing parameter: \(name)"
+            return "Serato Pitch n Time LE loaded but is missing the expected \(name) parameter. Reinstall or update Pitch n Time LE 3.1.1, then try again."
         case .renderFailed(let reason):
             return "render failed: \(reason)"
         }

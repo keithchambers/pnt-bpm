@@ -29,6 +29,31 @@ import Testing
     #expect(options.targets.map(\.value) == [125, 122, 120])
 }
 
+@Test func parsesOverwriteAliases() throws {
+    for flag in ["-o", "--overwrite"] {
+        let command = try CLIParser.parse([
+            "pnt-cli",
+            "song.wav",
+            "--source",
+            "128",
+            "--target",
+            "125",
+            flag
+        ])
+
+        guard case .render(let options) = command else {
+            Issue.record("expected render command")
+            return
+        }
+
+        #expect(options.overwrite)
+    }
+}
+
+@Test func emptyArgumentsShowHelp() throws {
+    #expect(try CLIParser.parse(["pnt-cli"]) == .help)
+}
+
 @Test func parsesShortVersionFlag() throws {
     #expect(try CLIParser.parse(["pnt-cli", "-v"]) == .version)
 }
@@ -241,6 +266,22 @@ import Testing
     let failure = reporter.finish()
 
     #expect((failure as? PntCliError) == expected)
+}
+
+@Test func audioUnitLoadErrorsExplainRecovery() {
+    let notFound = PntCliError.audioUnitNotFound.description
+    #expect(notFound.contains("processing audio"))
+    #expect(notFound.contains("Install"))
+    #expect(notFound.contains("authorized"))
+
+    let instantiateFailed = PntCliError.audioUnitInstantiateFailed("blocked").description
+    #expect(instantiateFailed.contains("processing audio"))
+    #expect(instantiateFailed.contains("installed"))
+    #expect(instantiateFailed.contains("authorized"))
+
+    let missingParameter = PntCliError.missingAudioUnitParameter("Time").description
+    #expect(missingParameter.contains("Reinstall or update"))
+    #expect(missingParameter.contains("Pitch n Time LE 3.1.1"))
 }
 
 @Test func multiInputPlansFanOutOverInputsAndTargets() throws {

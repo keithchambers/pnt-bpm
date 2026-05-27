@@ -20,7 +20,7 @@ terminal and enables parallel processing of multiple tracks for fast batch proce
 
 Download the latest signed installer and open it: [pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
 
-_Note: If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning._
+_Note: `pnt-cli` loads Pitch n' Time LE only when rendering. If Pitch n' Time LE is not installed or cannot be loaded, the render exits with an actionable error._
 
 ## Quick Start
 
@@ -43,6 +43,12 @@ Let `pnt-cli` auto-detect the source BPM from Beatport ID3 tags or filename slot
 ```sh
 pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
 # detects 125 BPM from the filename, then renders one file at 128 BPM
+```
+
+Overwrite existing output files with `-o` or `--overwrite`:
+
+```sh
+pnt-cli song.wav --source 120 --target 125,128 -o
 ```
 
 Output tracks keep the input track's file format, sample rate, and channel count.
