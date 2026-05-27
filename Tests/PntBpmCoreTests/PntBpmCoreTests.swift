@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import PntBpmCore
@@ -139,6 +140,39 @@ import Testing
     #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.wav", "c.wav"])
 }
 
+@Test func defaultsJobsToActiveProcessorCount() throws {
+    let command = try CLIParser.parse([
+        "pnt-bpm",
+        "song.wav",
+        "--source",
+        "128",
+        "--target",
+        "125"
+    ])
+
+    guard case .render(let options) = command else {
+        Issue.record("expected render command")
+        return
+    }
+
+    #expect(options.jobs == RenderOptions.defaultJobs)
+}
+
+@Test func rejectsJobsOverride() {
+    #expect(throws: PntBpmError.invalidOption("--jobs")) {
+        _ = try CLIParser.parse([
+            "pnt-bpm",
+            "song.wav",
+            "--source",
+            "128",
+            "--target",
+            "125",
+            "--jobs",
+            "4"
+        ])
+    }
+}
+
 @Test func rejectsCopyMetadataFlagBecauseMetadataCopyIsAutomatic() {
     #expect(throws: PntBpmError.invalidOption("--copy-metadata")) {
         _ = try CLIParser.parse([
@@ -162,6 +196,52 @@ import Testing
 
     #expect(options.input.path == "/tmp/song.wav")
     #expect(options.inputs.map(\.path) == ["/tmp/song.wav"])
+    #expect(options.jobs == RenderOptions.defaultJobs)
+}
+
+@Test func renderBatchRunnerRunsBoundedJobsConcurrentlyAndKeepsResultOrder() throws {
+    let plans = try (0..<4).map(makeTestPlan)
+    let state = ParallelRunnerTestState()
+    let started = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    let finished = DispatchSemaphore(value: 0)
+
+    DispatchQueue.global(qos: .userInitiated).async {
+        do {
+            let results = try RenderBatchRunner.render(plans: plans, jobs: 2) { plan in
+                state.enter()
+                started.signal()
+                release.wait()
+                state.leave()
+
+                let value = AVAudioFramePosition(Int64(plan.target.value))
+                return RenderResult(
+                    outputURL: plan.outputURL,
+                    inputFrames: value,
+                    renderedFrames: value,
+                    sampleRate: 1,
+                    seratoTime: plan.ratios.seratoTime,
+                    durationRatio: plan.ratios.outputDurationRatio
+                )
+            }
+            state.setValues(results.map(\.inputFrames))
+        } catch {
+            state.setError(error)
+        }
+        finished.signal()
+    }
+
+    #expect(started.wait(timeout: .now() + .seconds(2)) == .success)
+    #expect(started.wait(timeout: .now() + .seconds(2)) == .success)
+    #expect(state.maxActiveValue == 2)
+
+    for _ in plans {
+        release.signal()
+    }
+
+    #expect(finished.wait(timeout: .now() + .seconds(2)) == .success)
+    #expect(state.errorDescription == nil)
+    #expect(state.values == [120, 121, 122, 123])
 }
 
 @Test func multiInputPlansFanOutOverInputsAndTargets() throws {
@@ -561,6 +641,61 @@ import Testing
     let bytes = try Data(contentsOf: target)
     #expect(riffChunkData(id: "NAME", in: bytes) == nil)
     #expect(riffChunkData(id: "AUTH", in: bytes) == nil)
+}
+
+private final class ParallelRunnerTestState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = 0
+    private var maxActive = 0
+    private var storedValues: [AVAudioFramePosition]?
+    private var storedError: Error?
+
+    var maxActiveValue: Int {
+        lock.withLock { maxActive }
+    }
+
+    var values: [AVAudioFramePosition]? {
+        lock.withLock { storedValues }
+    }
+
+    var errorDescription: String? {
+        lock.withLock { storedError.map(String.init(describing:)) }
+    }
+
+    func enter() {
+        lock.withLock {
+            active += 1
+            maxActive = max(maxActive, active)
+        }
+    }
+
+    func leave() {
+        lock.withLock {
+            active -= 1
+        }
+    }
+
+    func setValues(_ values: [AVAudioFramePosition]) {
+        lock.withLock {
+            storedValues = values
+        }
+    }
+
+    func setError(_ error: Error) {
+        lock.withLock {
+            storedError = error
+        }
+    }
+}
+
+private func makeTestPlan(index: Int) throws -> OutputPlan {
+    OutputPlan(
+        input: URL(fileURLWithPath: "/tmp/input-\(index).wav"),
+        outputURL: URL(fileURLWithPath: "/tmp/output-\(index).wav"),
+        source: try BPM(120),
+        target: try BPM(120 + Double(index)),
+        format: "wav"
+    )
 }
 
 private func makeAIFFWithAIFFOnlyChunks(nameValue: String, authorValue: String) -> Data {

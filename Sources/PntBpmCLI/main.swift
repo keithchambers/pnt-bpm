@@ -17,6 +17,22 @@ func printPlan(_ plan: OutputPlan) {
     )
 }
 
+private final class LockedPrinter: @unchecked Sendable {
+    private let lock = NSLock()
+
+    func line(_ message: String) {
+        lock.withLock {
+            print(message)
+        }
+    }
+
+    func plan(_ plan: OutputPlan) {
+        lock.withLock {
+            printPlan(plan)
+        }
+    }
+}
+
 func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> [(URL, BPM)] {
     if let explicit {
         return inputs.map { ($0, explicit) }
@@ -34,6 +50,54 @@ func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> 
         }
         return (input, detected.bpm)
     }
+}
+
+private func validateOutputsAvailable(_ plans: [OutputPlan], overwrite: Bool) throws {
+    guard !overwrite else { return }
+
+    for plan in plans where FileManager.default.fileExists(atPath: plan.outputURL.path) {
+        throw PntBpmError.outputExists(plan.outputURL)
+    }
+}
+
+@discardableResult
+private func renderPlan(
+    _ plan: OutputPlan,
+    options: RenderOptions,
+    renderer: PitchNTimeRenderer,
+    printer: LockedPrinter,
+    progressLabel: String?
+) throws -> RenderResult {
+    if options.verbose {
+        printer.plan(plan)
+    } else {
+        printer.line("\(plan.target.description) BPM -> \(plan.outputURL.path)")
+    }
+
+    var lastProgressBucket = -1
+    let result = try renderer.render(
+        plan: plan,
+        overwrite: options.overwrite,
+        gain: options.gain,
+        tailMilliseconds: options.tailMilliseconds
+    ) { progress in
+        guard options.verbose else { return }
+        let bucket = Int((progress.fraction * 100).rounded(.down))
+        if bucket >= lastProgressBucket + 10 || bucket == 100 {
+            lastProgressBucket = bucket
+            if let progressLabel {
+                printer.line("  \(progressLabel): \(bucket)%")
+            } else {
+                printer.line("  \(bucket)%")
+            }
+        }
+    }
+
+    printer.line(
+        "  wrote \(result.outputURL.path) " +
+        "(\(durationString(result.inputDuration)) -> \(durationString(result.outputDuration)))"
+    )
+    return result
 }
 
 func run() throws {
@@ -78,34 +142,33 @@ func run() throws {
             return
         }
 
-        let renderer = PitchNTimeRenderer()
+        try validateOutputsAvailable(plans, overwrite: options.overwrite)
+        let printer = LockedPrinter()
 
-        for plan in plans {
-            if options.verbose {
-                printPlan(plan)
-            } else {
-                print("\(plan.target.description) BPM -> \(plan.outputURL.path)")
+        if options.jobs == 1 {
+            let renderer = PitchNTimeRenderer()
+            for plan in plans {
+                try renderPlan(
+                    plan,
+                    options: options,
+                    renderer: renderer,
+                    printer: printer,
+                    progressLabel: nil
+                )
             }
-
-            var lastProgressBucket = -1
-            let result = try renderer.render(
-                plan: plan,
-                overwrite: options.overwrite,
-                gain: options.gain,
-                tailMilliseconds: options.tailMilliseconds
-            ) { progress in
-                guard options.verbose else { return }
-                let bucket = Int((progress.fraction * 100).rounded(.down))
-                if bucket >= lastProgressBucket + 10 || bucket == 100 {
-                    lastProgressBucket = bucket
-                    print("  \(bucket)%")
-                }
+        } else {
+            _ = try RenderBatchRunner.render(
+                plans: plans,
+                jobs: options.jobs
+            ) { plan in
+                try renderPlan(
+                    plan,
+                    options: options,
+                    renderer: PitchNTimeRenderer(),
+                    printer: printer,
+                    progressLabel: plan.outputURL.lastPathComponent
+                )
             }
-
-            print(
-                "  wrote \(result.outputURL.path) " +
-                "(\(durationString(result.inputDuration)) -> \(durationString(result.outputDuration)))"
-            )
         }
     }
 }

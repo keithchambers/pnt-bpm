@@ -1,13 +1,17 @@
 import Foundation
 
-public enum Command: Equatable {
+public enum Command: Equatable, Sendable {
     case render(RenderOptions)
     case doctor(verbose: Bool)
     case help
     case version
 }
 
-public struct RenderOptions: Equatable {
+public struct RenderOptions: Equatable, Sendable {
+    public static var defaultJobs: Int {
+        max(1, ProcessInfo.processInfo.activeProcessorCount)
+    }
+
     public var inputs: [URL]
     /// Source BPM applied to every input. nil means "auto-detect per input".
     public var source: BPM?
@@ -20,6 +24,10 @@ public struct RenderOptions: Equatable {
     public var verbose: Bool
     public var gain: Float
     public var tailMilliseconds: Double
+
+    public var jobs: Int {
+        Self.defaultJobs
+    }
 
     public var input: URL {
         inputs[0]

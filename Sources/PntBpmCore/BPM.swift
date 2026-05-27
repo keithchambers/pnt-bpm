@@ -29,7 +29,7 @@ public struct BPM: Equatable, Comparable, Sendable, CustomStringConvertible {
     }
 }
 
-public struct TempoRatios: Equatable {
+public struct TempoRatios: Equatable, Sendable {
     public let source: BPM
     public let target: BPM
 

@@ -2,7 +2,7 @@ import AVFoundation
 import AudioToolbox
 import Foundation
 
-public struct RenderResult: Equatable {
+public struct RenderResult: Equatable, Sendable {
     public let outputURL: URL
     public let inputFrames: AVAudioFramePosition
     public let renderedFrames: AVAudioFramePosition
@@ -19,7 +19,7 @@ public struct RenderResult: Equatable {
     }
 }
 
-public struct RenderProgress: Equatable {
+public struct RenderProgress: Equatable, Sendable {
     public let renderedFrames: AVAudioFramePosition
     public let totalFrames: AVAudioFramePosition
 
