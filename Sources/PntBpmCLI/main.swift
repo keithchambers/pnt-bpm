@@ -144,8 +144,9 @@ func run() throws {
 
         try validateOutputsAvailable(plans, overwrite: options.overwrite)
         let printer = LockedPrinter()
+        let jobs = RenderOptions.defaultJobs
 
-        if options.jobs == 1 {
+        if jobs == 1 {
             let renderer = PitchNTimeRenderer()
             for plan in plans {
                 try renderPlan(
@@ -159,7 +160,7 @@ func run() throws {
         } else {
             _ = try RenderBatchRunner.render(
                 plans: plans,
-                jobs: options.jobs
+                jobs: jobs
             ) { plan in
                 try renderPlan(
                     plan,

@@ -25,10 +25,6 @@ public struct RenderOptions: Equatable, Sendable {
     public var gain: Float
     public var tailMilliseconds: Double
 
-    public var jobs: Int {
-        Self.defaultJobs
-    }
-
     public var input: URL {
         inputs[0]
     }

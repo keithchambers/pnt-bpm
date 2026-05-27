@@ -140,22 +140,8 @@ import Testing
     #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.wav", "c.wav"])
 }
 
-@Test func defaultsJobsToActiveProcessorCount() throws {
-    let command = try CLIParser.parse([
-        "pnt-bpm",
-        "song.wav",
-        "--source",
-        "128",
-        "--target",
-        "125"
-    ])
-
-    guard case .render(let options) = command else {
-        Issue.record("expected render command")
-        return
-    }
-
-    #expect(options.jobs == RenderOptions.defaultJobs)
+@Test func defaultJobsIsPositive() {
+    #expect(RenderOptions.defaultJobs >= 1)
 }
 
 @Test func rejectsJobsOverride() {
@@ -196,7 +182,6 @@ import Testing
 
     #expect(options.input.path == "/tmp/song.wav")
     #expect(options.inputs.map(\.path) == ["/tmp/song.wav"])
-    #expect(options.jobs == RenderOptions.defaultJobs)
 }
 
 @Test func renderBatchRunnerRunsBoundedJobsConcurrentlyAndKeepsResultOrder() throws {
