@@ -1,0 +1,16 @@
+.DS_Store
+.build/
+.swiftpm/
+dist/
+renders/
+samples/
+prototypes/
+*.wav
+*.aiff
+*.aif
+*.mp3
+*.m4a
+history.md
+implementation-plan.md
+stem-separation-model-research.md
+README_v*.md

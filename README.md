@@ -1,0 +1,131 @@
+# pnt-bpm
+
+## Overview
+
+Serato Pitch n' Time provides the industry's leading pitch-shifting and time-stretching plugin in terms of overall musicality, helping producers and DJs change tempo while preserving pitch and avoiding the artifacts that cheaper time-stretch algorithms can introduce.
+
+Serato only supports Pitch n' Time running in Logic Pro and Pro Tools DAWs. That is powerful for studio workflows, but it creates friction for repeatable batch work: launching a DAW, creating or opening a session, loading the plugin, setting tempo changes, bouncing files, and repeating the process for every target BPM.
+
+`pnt-bpm` eliminates that DAW dependency for macOS users who already have Serato Pitch n' Time LE installed locally. It hosts the installed Pitch n' Time Audio Unit directly from the command line, enabling Pitch n' Time users on macOS to convert the BPM of a track to a different BPM without changing pitch.
+
+Example:
+
+```sh
+pnt-bpm song.aiff --source 120 --target 125,128
+```
+
+This creates new rendered audio files at 125 BPM and 128 BPM using Serato Pitch n' Time for the tempo conversion.
+
+`pnt-bpm` is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Serato. It does not include Serato Pitch n' Time; users must install and license Serato Pitch n' Time LE separately.
+
+## Installation
+
+Requirements:
+
+- macOS
+- Serato Pitch n' Time LE installed locally
+- Xcode Command Line Tools or Xcode
+- Swift Package Manager, included with Apple's developer tools
+
+Install Apple's developer tools if needed:
+
+```sh
+xcode-select --install
+```
+
+Clone and build:
+
+```sh
+git clone https://github.com/keithchambers/pnt-bpm.git
+cd pnt-bpm
+swift build -c release
+```
+
+Verify that the CLI can load Serato Pitch n' Time:
+
+```sh
+.build/release/pnt-bpm --doctor --verbose
+```
+
+Install the binary to `~/.local/bin`:
+
+```sh
+scripts/install.sh
+```
+
+Make sure `~/.local/bin` is on your `PATH`. For zsh, add this to `~/.zshrc` if needed:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+You can also install from a release zip by unpacking it and running:
+
+```sh
+./install.sh
+```
+
+## Usage
+
+Render one target BPM:
+
+```sh
+pnt-bpm song.wav --source 120 --target 125
+```
+
+Render multiple target BPMs:
+
+```sh
+pnt-bpm song.wav --source 120 --target 125,128
+```
+
+`--output` is accepted as an alias for `--target`:
+
+```sh
+pnt-bpm song.wav --source 120 --output 125,128
+```
+
+Write files to a specific directory:
+
+```sh
+pnt-bpm song.aiff --source 120 --target 125,128 --out-dir renders
+```
+
+Preview what will be rendered without writing files:
+
+```sh
+pnt-bpm song.aiff --source 120 --target 125,128 --dry-run
+```
+
+Overwrite existing output files:
+
+```sh
+pnt-bpm song.aiff --source 120 --target 125,128 --overwrite
+```
+
+Show detailed render ratios and progress:
+
+```sh
+pnt-bpm song.aiff --source 120 --target 125,128 --verbose
+```
+
+Default output names use this pattern:
+
+```text
+{title}_{bpm}bpm.wav
+```
+
+For example:
+
+```text
+song_125bpm.wav
+song_128bpm.wav
+```
+
+Use a custom output naming pattern:
+
+```sh
+pnt-bpm song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm}.{ext}"
+```
+
+The current release writes WAV output at the input sample rate and channel count.
