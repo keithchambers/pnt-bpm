@@ -24,7 +24,7 @@ import Testing
         return
     }
 
-    #expect(options.source.value == 128)
+    #expect(options.source?.value == 128)
     #expect(options.targets.map(\.value) == [125, 122, 120])
 }
 
@@ -82,4 +82,52 @@ import Testing
             nameTemplate: "{title}_{bpm}bpm.{ext}"
         )
     }
+}
+
+@Test func sourceIsOptionalWhenAutoDetectIntended() throws {
+    let command = try CLIParser.parse([
+        "pnt-bpm", "song.aiff", "--target", "125"
+    ])
+    guard case .render(let options) = command else {
+        Issue.record("expected render command")
+        return
+    }
+    #expect(options.source == nil)
+    #expect(options.targets.map(\.value) == [125])
+}
+
+@Test func detectsBeatportFilenameBPM() {
+    let bpm = SourceBPMDetector.scanForBPM(
+        in: "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor"
+    )
+    #expect(bpm?.value == 125)
+}
+
+@Test func ignoresBeatportTrackIdInBPMSlot() {
+    // Older Beatport AIFFs used a 7–8 digit track ID in the same slot.
+    let bpm = SourceBPMDetector.scanForBPM(
+        in: "Emi_Galvan_Samsara_(Original_Mix)__17628366__E_Major"
+    )
+    #expect(bpm == nil)
+}
+
+@Test func detectsMvsepTrailingBPM() {
+    #expect(SourceBPMDetector.scanForBPM(in: "technasia-i-am-somebody-original-mix-125")?.value == 125)
+    #expect(SourceBPMDetector.scanForBPM(in: "tuccillo-unblock-original-mix-120-g-mi")?.value == 120)
+    #expect(SourceBPMDetector.scanForBPM(in: "andrew-meller-bee-original-mix-125-bb-minor")?.value == 125)
+}
+
+@Test func rejectsImplausibleTrailingNumber() {
+    // mvsep duplicate-suffix counters like "-1", "-2" must not be read as BPM.
+    #expect(SourceBPMDetector.scanForBPM(in: "andain-beautiful-things-original-mix-1") == nil)
+    // Track-number prefixes shouldn't get picked up as BPM either.
+    #expect(SourceBPMDetector.scanForBPM(in: "01-hermanez-gold-coast-original") == nil)
+}
+
+@Test func walksUpParentDirectoriesForBPM() {
+    // Synthesize the mvsep nested layout: <track>/<run>/vocals.wav
+    let url = URL(fileURLWithPath: "/tmp/mvsep-test/technasia-i-am-somebody-original-mix-125/2025-01-16_all_in_ensemble/vocals.wav")
+    let detected = SourceBPMDetector().detect(input: url)
+    #expect(detected?.bpm.value == 125)
+    #expect(detected?.source.hasPrefix("parent dir:") == true)
 }

@@ -4,6 +4,7 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
     case usage(String)
     case missingInput
     case missingSource
+    case undetectableSource(URL)
     case missingTargets
     case invalidBPM(String)
     case invalidOption(String)
@@ -22,6 +23,8 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
             return "missing input audio file"
         case .missingSource:
             return "missing required --source BPM"
+        case .undetectableSource(let url):
+            return "could not auto-detect source BPM for \(url.lastPathComponent); pass --source <BPM>"
         case .missingTargets:
             return "missing required --target/--output BPM values"
         case .invalidBPM(let value):

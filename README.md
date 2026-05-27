@@ -73,6 +73,34 @@ Render one target BPM:
 pnt-bpm song.wav --source 120 --target 125
 ```
 
+### Auto-detecting the source BPM
+
+If you omit `--source`, `pnt-bpm` will try to figure out the source BPM from
+the file itself, in this order:
+
+1. **Embedded metadata** — ID3 `TBPM`, iTunes `tmpo`, and similar tags via
+   AVFoundation. Works on most properly tagged tracks (e.g. Beatport AIFFs
+   with an embedded ID3 chunk, MixedInKey-tagged files, anything with an
+   iTunes-style "tmpo" atom).
+2. **Filename** — Beatport's `..._(Mix)__BPM__Key.aiff` slot, or a trailing
+   `-BPM` / `-BPM-key` token.
+3. **Parent directories** — walks up to three ancestor folders. This is how
+   mvsep.com stem layouts are detected: the per-track folder name carries
+   the BPM (e.g. `andrew-meller-bee-original-mix-125-bb-minor/`) even
+   though the stem WAVs themselves don't.
+
+```sh
+# Source BPM is read from the embedded ID3 TBPM tag:
+pnt-bpm "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
+
+# Source BPM is read from the parent folder name:
+pnt-bpm mvsep-out/andrew-meller-bee-original-mix-125-bb-minor/2025-01-16_all_in_ensemble/vocals.wav --target 128
+```
+
+Values outside 50–220 BPM are rejected as implausible — this filters out
+Beatport's older 7–8-digit track-IDs and mvsep's `-1`, `-2` duplicate
+suffixes. If detection fails, pass `--source <BPM>` explicitly.
+
 Render multiple target BPMs:
 
 ```sh
