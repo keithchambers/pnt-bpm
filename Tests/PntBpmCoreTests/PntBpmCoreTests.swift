@@ -71,6 +71,31 @@ import Testing
     }
 }
 
+@Test func rejectsMP3Inputs() {
+    #expect(throws: PntBpmError.unsupportedInputFormat(URL(fileURLWithPath: "/tmp/song.mp3"))) {
+        _ = try CLIParser.parse([
+            "pnt-bpm",
+            "/tmp/song.mp3",
+            "--source",
+            "120",
+            "--target",
+            "125"
+        ])
+    }
+
+    #expect(throws: PntBpmError.unsupportedInputFormat(URL(fileURLWithPath: "/tmp/song.MP3"))) {
+        _ = try CLIParser.parse([
+            "pnt-bpm",
+            "--input",
+            "/tmp/song.MP3",
+            "--source",
+            "120",
+            "--target",
+            "125"
+        ])
+    }
+}
+
 @Test func parsesMultiplePositionalInputs() throws {
     let command = try CLIParser.parse([
         "pnt-bpm",

@@ -10,40 +10,24 @@ if [[ -z "$version" ]]; then
   exit 1
 fi
 
-arch="$(uname -m)"
-package_name="pnt-bpm-${version}-macos-${arch}"
-package_dir="dist/$package_name"
+pkg_name="pnt-bpm-${version}.pkg"
+payload_dir="dist/pkgroot"
+binary_path=".build/apple/Products/Release/pnt-bpm"
 
 swift test
-swift build -c release
+swift build -c release --arch arm64 --arch x86_64
 
-rm -rf "$package_dir" "$package_dir.zip"
-mkdir -p "$package_dir"
+rm -rf "$payload_dir" "dist/$pkg_name"
+mkdir -p "$payload_dir/usr/local/bin"
 
-cp ".build/release/pnt-bpm" "$package_dir/pnt-bpm"
-cp "scripts/install.sh" "$package_dir/install.sh"
-cp "README.md" "$package_dir/README.md"
-cp "LICENSE" "$package_dir/LICENSE"
-chmod +x "$package_dir/pnt-bpm" "$package_dir/install.sh"
+cp "$binary_path" "$payload_dir/usr/local/bin/pnt-bpm"
+chmod 0755 "$payload_dir/usr/local/bin/pnt-bpm"
 
-cat > "$package_dir/README.txt" <<README
-pnt-bpm $version
+/usr/bin/pkgbuild \
+  --root "$payload_dir" \
+  --identifier "com.keithchambers.pnt-bpm" \
+  --version "$version" \
+  --install-location "/" \
+  "dist/$pkg_name"
 
-Install:
-  ./install.sh
-
-Verify Serato Pitch n' Time LE can be loaded:
-  pnt-bpm --doctor --verbose
-
-Usage:
-  pnt-bpm song.aiff --source 120 --target 125,128
-
-Serato Pitch n' Time LE must be installed and licensed separately.
-README
-
-(
-  cd dist
-  /usr/bin/zip -r -X "$package_name.zip" "$package_name" >/dev/null
-)
-
-echo "Created dist/$package_name.zip"
+echo "Created dist/$pkg_name"

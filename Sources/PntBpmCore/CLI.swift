@@ -170,6 +170,7 @@ public struct CLIParser {
         let targets = try parseBPMList(targetRaw)
         let outDir = outDirPath.map { URL(fileURLWithPath: $0) }
         let inputs = inputPaths.map { URL(fileURLWithPath: $0) }
+        try validateInputFormats(inputs)
 
         return .render(
             RenderOptions(
@@ -187,9 +188,15 @@ public struct CLIParser {
             )
         )
     }
+
+    private static func validateInputFormats(_ inputs: [URL]) throws {
+        for input in inputs where input.pathExtension.lowercased() == "mp3" {
+            throw PntBpmError.unsupportedInputFormat(input)
+        }
+    }
 }
 
-public let pntBpmVersion = "0.1.0"
+public let pntBpmVersion = "1.0.0"
 
 public let helpText = """
 pnt-bpm \(pntBpmVersion)
@@ -208,7 +215,7 @@ EXAMPLES:
 ARGUMENTS:
   <INPUT> [INPUT...]
       One or more input audio files readable by macOS, such as WAV, AIFF,
-      CAF, MP3, or M4A. Every input is rendered at every target BPM.
+      CAF, or M4A. Every input is rendered at every target BPM.
 
 REQUIRED:
   -t, --target <BPM[,BPM...]>
