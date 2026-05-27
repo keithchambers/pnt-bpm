@@ -44,6 +44,8 @@ jobs:
           security create-keychain -p "$signing_keychain_password" "$signing_keychain"
           security set-keychain-settings -lut 21600 "$signing_keychain"
           security unlock-keychain -p "$signing_keychain_password" "$signing_keychain"
+          mapfile -t user_keychains < <(security list-keychains -d user | sed 's/^ *"//; s/"$//')
+          security list-keychains -d user -s "$signing_keychain" "${user_keychains[@]}"
           security import "$app_certificate" -k "$signing_keychain" -P "$DEVELOPER_ID_APPLICATION_P12_PASSWORD" -T /usr/bin/codesign
           security import "$installer_certificate" -k "$signing_keychain" -P "$DEVELOPER_ID_INSTALLER_P12_PASSWORD" -T /usr/bin/pkgbuild -T /usr/bin/productsign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$signing_keychain_password" "$signing_keychain"
