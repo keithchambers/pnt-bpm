@@ -20,5 +20,8 @@ jobs:
       - name: Run tests
         run: swift test
 
-      - name: Build release binary
-        run: swift build -c release
+      - name: Build release package
+        run: scripts/package-release.sh
+
+      - name: Verify release package
+        run: scripts/verify-package.sh

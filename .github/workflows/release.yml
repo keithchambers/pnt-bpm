@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Validate tag matches CLI version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cli_version="$(sed -n 's/^public let pntBpmVersion = "\(.*\)"$/\1/p' Sources/PntBpmCore/CLI.swift)"
+          test "$tag_version" = "$cli_version"
+
+      - name: Build release package
+        run: scripts/package-release.sh
+
+      - name: Verify release package
+        run: scripts/verify-package.sh
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          package="dist/pnt-bpm-${version}.pkg"
+          gh release create "$GITHUB_REF_NAME" "$package" \
+            --title "pnt-bpm $version" \
+            --notes "Download pnt-bpm-${version}.pkg and open it."

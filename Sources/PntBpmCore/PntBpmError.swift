@@ -8,6 +8,7 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
     case missingTargets
     case invalidBPM(String)
     case invalidOption(String)
+    case unsupportedInputFormat(URL)
     case unsupportedFormat(String)
     case outputExists(URL)
     case outputCollision(URL)
@@ -32,6 +33,8 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
             return "invalid BPM value: \(value)"
         case .invalidOption(let option):
             return "invalid option: \(option)"
+        case .unsupportedInputFormat(let url):
+            return "unsupported input format: \(url.lastPathComponent) (MP3 input is not supported)"
         case .unsupportedFormat(let format):
             return "unsupported output format: \(format)"
         case .outputExists(let url):

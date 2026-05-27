@@ -22,47 +22,19 @@ This creates new rendered audio files at 125 BPM and 128 BPM using Serato Pitch 
 
 Requirements:
 
-- macOS
+- macOS 13 or newer
 - Serato Pitch n' Time LE installed locally
-- Xcode Command Line Tools or Xcode
-- Swift Package Manager, included with Apple's developer tools
 
-Install Apple's developer tools if needed:
+Download the macOS release package:
 
-```sh
-xcode-select --install
-```
+[pnt-bpm-1.0.0.pkg](https://github.com/keithchambers/pnt-bpm/releases/download/v1.0.0/pnt-bpm-1.0.0.pkg)
 
-Clone and build:
-
-```sh
-git clone https://github.com/keithchambers/pnt-bpm.git
-cd pnt-bpm
-swift build -c release
-```
+Open `pnt-bpm-1.0.0.pkg` and follow the installer prompts.
 
 Verify that the CLI can load Serato Pitch n' Time:
 
 ```sh
-.build/release/pnt-bpm --doctor --verbose
-```
-
-Install the binary to `~/.local/bin`:
-
-```sh
-scripts/install.sh
-```
-
-Make sure `~/.local/bin` is on your `PATH`. For zsh, add this to `~/.zshrc` if needed:
-
-```sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-You can also install from a release zip by unpacking it and running:
-
-```sh
-./install.sh
+pnt-bpm --doctor --verbose
 ```
 
 ## Usage
@@ -79,8 +51,7 @@ If you omit `--source`, `pnt-bpm` will try to read the BPM from a
 Beatport-purchased track in one of two ways:
 
 1. **ID3 `TBPM` frame** embedded in the file's metadata (Beatport
-   typically writes this as an `ID3 ` chunk at the tail of the AIFF, and
-   in the ID3v2 header of the MP3 download).
+   typically writes this as an `ID3 ` chunk at the tail of the AIFF).
 2. **Beatport filename slot** — the BPM that sits between double
    underscores in Beatport's naming convention,
    `Artist_Title_(Mix)__<BPM>__<Key>.aiff`.
