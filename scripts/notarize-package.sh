@@ -51,7 +51,39 @@ else
   exit 1
 fi
 
-/usr/bin/xcrun notarytool submit "${notary_args[@]}" --wait "$package"
+notary_timeout="${PNT_CLI_NOTARY_TIMEOUT:-45m}"
+
+echo "Submitting $package to Apple notary service..."
+submit_output="$(/usr/bin/xcrun notarytool submit "${notary_args[@]}" --output-format json "$package")"
+echo "$submit_output"
+
+submission_id="$(printf '%s' "$submit_output" | /usr/bin/plutil -extract id raw -o - -)"
+if [[ -z "$submission_id" ]]; then
+  echo "Could not determine Apple notary submission ID." >&2
+  exit 1
+fi
+
+echo "Waiting up to $notary_timeout for Apple notary submission $submission_id..."
+set +e
+wait_output="$(/usr/bin/xcrun notarytool wait "${notary_args[@]}" --timeout "$notary_timeout" --output-format json "$submission_id" 2>&1)"
+wait_status=$?
+set -e
+echo "$wait_output"
+
+if (( wait_status != 0 )); then
+  echo "Apple notarization did not complete successfully for submission $submission_id." >&2
+  /usr/bin/xcrun notarytool info "${notary_args[@]}" --output-format json "$submission_id" >&2 || true
+  /usr/bin/xcrun notarytool log "${notary_args[@]}" "$submission_id" >&2 || true
+  exit "$wait_status"
+fi
+
+notary_status="$(printf '%s' "$wait_output" | /usr/bin/plutil -extract status raw -o - - 2>/dev/null || true)"
+if [[ "$notary_status" != "Accepted" ]]; then
+  echo "Apple notarization finished with unexpected status: ${notary_status:-unknown}" >&2
+  /usr/bin/xcrun notarytool log "${notary_args[@]}" "$submission_id" >&2 || true
+  exit 1
+fi
+
 /usr/bin/xcrun stapler staple "$package"
 /usr/bin/xcrun stapler validate "$package"
 
