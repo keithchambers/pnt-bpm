@@ -39,10 +39,10 @@ public final class PitchNTimeRenderer {
     public func render(
         plan: OutputPlan,
         overwrite: Bool,
-        gain: Float,
-        tailMilliseconds: Double,
         progress: ((RenderProgress) -> Void)? = nil
     ) throws -> RenderResult {
+        let gain: Float = 1.0
+        let tailMilliseconds: Double = 0
         if fileManager.fileExists(atPath: plan.outputURL.path) {
             guard overwrite else {
                 throw PntCliError.outputExists(plan.outputURL)
@@ -79,7 +79,7 @@ public final class PitchNTimeRenderer {
             maximumFrameCount: 4096
         )
 
-        let outputSettings = try wavSettings(for: processingFormat)
+        let outputSettings = try linearPCMSettings(for: processingFormat)
         let tailFrames = AVAudioFramePosition((tailMilliseconds / 1000.0 * processingFormat.sampleRate).rounded(.up))
         let targetFrames = AVAudioFramePosition(
             (Double(inputFile.length) * plan.ratios.outputDurationRatio).rounded(.up)
@@ -162,7 +162,7 @@ public final class PitchNTimeRenderer {
         )
     }
 
-    private func wavSettings(for format: AVAudioFormat) throws -> [String: Any] {
+    private func linearPCMSettings(for format: AVAudioFormat) throws -> [String: Any] {
         let channelCount = Int(format.channelCount)
         guard channelCount > 0 else {
             throw PntCliError.renderFailed("input has no audio channels")

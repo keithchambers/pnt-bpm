@@ -1,165 +1,61 @@
-# pnt-cli
+<div align="center">
+  <h1>pnt-cli</h1>
+  <p><strong>Batch tempo-change audio files with Serato Pitch n' Time LE — no DAW required</strong></p>
+
+  <p>
+    <a href="https://github.com/keithchambers/pnt-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/keithchambers/pnt-cli/ci.yml?branch=main&label=build" alt="Build Status"></a>
+    <a href="https://github.com/keithchambers/pnt-cli/releases/latest"><img src="https://img.shields.io/github/v/release/keithchambers/pnt-cli?label=release" alt="Latest release"></a>
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey" alt="Platform: macOS 13+">
+  </p>
+</div>
 
 ## Overview
 
-Serato Pitch n' Time provides the industry's leading pitch-shifting and time-stretching plugin in terms of overall musicality, helping producers and DJs change tempo while preserving pitch and avoiding the artifacts that cheaper time-stretch algorithms can introduce.
+Serato Pitch n' Time is the industry-standard pitch-shifting and time-stretching plugin for producers and DJs. It
+changes a track's tempo while preserving its pitch, avoiding the artifacts that cheaper time-stretch algorithms
+introduce. Serato ships Pitch n' Time as a plugin that only loads inside Logic Pro and Pro Tools, which turns one-off
+tempo changes into a multi-step ritual: launch a DAW, create a session, load the plugin, set the tempo, bounce,
+repeat.
 
-Serato only supports Pitch n' Time running in Logic Pro and Pro Tools DAWs. That is powerful for studio workflows, but it creates friction for repeatable batch work: launching a DAW, creating or opening a session, loading the plugin, setting tempo changes, bouncing files, and repeating the process for every target BPM.
+`pnt-cli` brings Pitch n' Time LE to the command line. It hosts the locally installed Pitch n' Time Audio Unit
+directly from a terminal, so a track — or a folder of tracks — can be rendered to one or more target BPMs in a single
+command. Source metadata and artwork are copied to each output, and the BPM tag is updated to match the target.
 
-`pnt-cli` eliminates that DAW dependency for macOS users who already have Serato Pitch n' Time LE installed locally. It hosts the installed Pitch n' Time Audio Unit directly from the command line, enabling Pitch n' Time users on macOS to convert the BPM of a track to a different BPM without changing pitch.
-
-Example:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128
-```
-
-This creates new rendered audio files at 125 BPM and 128 BPM using Serato Pitch n' Time for the tempo conversion.
-
-`pnt-cli` is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Serato. It does not include Serato Pitch n' Time; users must install and license Serato Pitch n' Time LE separately.
+`pnt-cli` is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Serato, and
+does not include Pitch n' Time — install and license Pitch n' Time LE separately.
 
 ## Installation
 
-Requirements:
+**Requirements:** macOS 13 or newer, with Serato Pitch n' Time LE installed locally.
 
-- macOS 13 or newer
-- Serato Pitch n' Time LE installed locally
-
-Download the macOS release package:
+Download the latest signed installer and open it:
 
 [pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
 
-Open `pnt-cli-1.0.0.pkg` and follow the installer prompts.
+If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning and
+exits with status 1.
 
-Verify that the CLI can load Serato Pitch n' Time:
+## Quick Start
 
-```sh
-pnt-cli --doctor --verbose
-```
-
-## Usage
-
-Render one target BPM:
-
-```sh
-pnt-cli song.wav --source 120 --target 125
-```
-
-### Auto-detecting the source BPM (Beatport only)
-
-If you omit `--source`, `pnt-cli` will try to read the BPM from a
-Beatport-purchased track in one of two ways:
-
-1. **ID3 `TBPM` frame** embedded in the file's metadata (Beatport
-   typically writes this as an `ID3 ` chunk at the tail of the AIFF).
-2. **Beatport filename slot** — the BPM that sits between double
-   underscores in Beatport's naming convention,
-   `Artist_Title_(Mix)__<BPM>__<Key>.aiff`.
-
-```sh
-# Either the ID3 TBPM frame or the __125__ slot in the filename works:
-pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
-```
-
-Values outside 50–220 BPM are rejected — this filters out Beatport's
-older 7–8-digit track-IDs that occasionally appear in the same slot
-(`__17628366__`). Nothing else is attempted: there is no parent-directory
-walk, no generic metadata-key search, and no audio-content analysis. If
-neither source is present, `pnt-cli` errors out and you should pass
-`--source <BPM>` explicitly.
-
-Render multiple target BPMs:
+Render one input to multiple target BPMs:
 
 ```sh
 pnt-cli song.wav --source 120 --target 125,128
+# writes song_125bpm.wav and song_128bpm.wav next to the input
 ```
 
-Render multiple source files at the same target BPMs in a single run. Every
-input is warped to every target, so the command below produces six files
-(three inputs × two targets):
+Render multiple inputs to multiple targets in a single batch — every input is rendered at every target:
 
 ```sh
-pnt-cli a.wav b.wav c.aiff --source 120 --target 125,128
+pnt-cli vocals.wav drums.wav bass.wav --source 126 --target 120,124,128 -d renders/
+# 3 inputs × 3 targets = 9 renders, all written to ./renders/
 ```
 
-Those planned renders run concurrently by default — `pnt-cli` fans out across
-the active CPU count reported by macOS, and each job loads its own Pitch n'
-Time Audio Unit instance.
-
-When `--source` is omitted with multiple inputs, the source BPM is detected
-independently for each file — so a batch of Beatport tracks at different
-tempos can be rendered to a shared target in one invocation:
+Let `pnt-cli` auto-detect the source BPM from Beatport ID3 tags or filename slots:
 
 ```sh
-pnt-cli "Artist_A_Track_A_(Original_Mix)__125__G_Minor.aiff" \
-  "Artist_B_Track_B_(Extended_Mix)__128__A_Minor.aiff" \
-  --target 124
+pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
+# detects 125 BPM from the filename, then renders one file at 128 BPM
 ```
 
-Inputs can also be passed via repeated `-i`/`--input` flags, which is handy
-when paths contain spaces or come from another command:
-
-```sh
-pnt-cli -i "track one.wav" -i "track two.wav" --source 120 --target 125,128
-```
-
-`--output` is accepted as an alias for `--target`:
-
-```sh
-pnt-cli song.wav --source 120 --output 125,128
-```
-
-Write files to a specific directory:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128 --out-dir renders
-```
-
-Preview what will be rendered without writing files:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128 --dry-run
-```
-
-Overwrite existing output files:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128 --overwrite
-```
-
-Rendered WAVs automatically copy source track metadata and artwork when
-present. If the source metadata includes a BPM field, the copied metadata
-is updated to match each target BPM.
-
-Show detailed render ratios and progress:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128 --verbose
-```
-
-Default output names use this pattern:
-
-```text
-{title}_{bpm}bpm.wav
-```
-
-For example:
-
-```text
-song_125bpm.wav
-song_128bpm.wav
-```
-
-Use a custom output naming pattern:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm}.{ext}"
-```
-
-When rendering multiple inputs into a shared `--out-dir`, `pnt-cli` refuses
-to start if two planned renders would write to the same output path (for
-example, two files both named `song` from different directories). This collision
-check runs before concurrent jobs start. Rename one of the inputs or render each
-one into its own directory to avoid the collision.
-
-The current release writes WAV output at the input sample rate and channel count.
+Outputs keep the input's file format, sample rate, and channel count.

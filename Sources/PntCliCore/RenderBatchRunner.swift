@@ -8,6 +8,54 @@ public enum RenderBatchRunner {
     ) throws -> [RenderResult] {
         try BoundedWorkRunner.run(plans, jobs: jobs, work: render)
     }
+
+    /// Run `body` for each plan with up to `jobs` workers, continuing past per-item failures.
+    /// The body is responsible for handling its own errors (e.g. recording them on a reporter).
+    public static func forEach(
+        plans: [OutputPlan],
+        jobs: Int,
+        body: @escaping @Sendable (OutputPlan) -> Void
+    ) {
+        guard !plans.isEmpty else { return }
+        let workerCount = max(1, min(jobs, plans.count))
+
+        if workerCount == 1 {
+            plans.forEach(body)
+            return
+        }
+
+        let cursor = WorkCursor(count: plans.count)
+        let group = DispatchGroup()
+
+        for _ in 0..<workerCount {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { group.leave() }
+                while let i = cursor.next() {
+                    body(plans[i])
+                }
+            }
+        }
+
+        group.wait()
+    }
+}
+
+private final class WorkCursor: @unchecked Sendable {
+    private let lock = NSLock()
+    private let count: Int
+    private var index = 0
+
+    init(count: Int) { self.count = count }
+
+    func next() -> Int? {
+        lock.withLock {
+            guard index < count else { return nil }
+            let i = index
+            index += 1
+            return i
+        }
+    }
 }
 
 enum BoundedWorkRunner {
