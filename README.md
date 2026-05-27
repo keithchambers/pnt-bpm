@@ -32,12 +32,6 @@ Download the latest signed installer and open it:
 
 [pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
 
-Verify the install:
-
-```sh
-pnt-cli --help
-```
-
 If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning and
 exits with status 1.
 
