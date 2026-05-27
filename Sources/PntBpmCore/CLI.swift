@@ -252,6 +252,9 @@ OUTPUT:
   --overwrite
       Replace existing files.
 
+  Rendered targets automatically copy source track metadata and artwork.
+  BPM metadata is updated to match each target BPM when present.
+
 SERATO:
   --gain <VALUE>
       Linear gain sent to Pitch n Time.

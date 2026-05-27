@@ -80,13 +80,6 @@ public final class PitchNTimeRenderer {
         )
 
         let outputSettings = try wavSettings(for: processingFormat)
-        let outputFile = try AVAudioFile(
-            forWriting: plan.outputURL,
-            settings: outputSettings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
-
         let tailFrames = AVAudioFramePosition((tailMilliseconds / 1000.0 * processingFormat.sampleRate).rounded(.up))
         let targetFrames = AVAudioFramePosition(
             (Double(inputFile.length) * plan.ratios.outputDurationRatio).rounded(.up)
@@ -99,47 +92,65 @@ public final class PitchNTimeRenderer {
             throw PntBpmError.renderFailed("could not allocate render buffer")
         }
 
-        try engine.start()
-        player.scheduleFile(inputFile, at: nil)
-        player.play()
-
         var renderedFrames: AVAudioFramePosition = 0
-        progress?(RenderProgress(renderedFrames: renderedFrames, totalFrames: targetFrames))
+        do {
+            let outputFile = try AVAudioFile(
+                forWriting: plan.outputURL,
+                settings: outputSettings,
+                commonFormat: .pcmFormatFloat32,
+                interleaved: false
+            )
 
-        // Stop after this many consecutive zero-progress polls — the source has
-        // run dry and additional offline pulls would spin forever.
-        let maxIdlePolls = 8
-        var idlePolls = 0
+            try engine.start()
+            player.scheduleFile(inputFile, at: nil)
+            player.play()
 
-        renderLoop: while renderedFrames < targetFrames {
-            let remaining = targetFrames - renderedFrames
-            let frameCount = min(AVAudioFrameCount(remaining), engine.manualRenderingMaximumFrameCount)
-            let status = try engine.renderOffline(frameCount, to: renderBuffer)
+            progress?(RenderProgress(renderedFrames: renderedFrames, totalFrames: targetFrames))
 
-            switch status {
-            case .success:
-                if renderBuffer.frameLength == 0 {
+            // Stop after this many consecutive zero-progress polls — the source has
+            // run dry and additional offline pulls would spin forever.
+            let maxIdlePolls = 8
+            var idlePolls = 0
+
+            renderLoop: while renderedFrames < targetFrames {
+                let remaining = targetFrames - renderedFrames
+                let frameCount = min(AVAudioFrameCount(remaining), engine.manualRenderingMaximumFrameCount)
+                let status = try engine.renderOffline(frameCount, to: renderBuffer)
+
+                switch status {
+                case .success:
+                    if renderBuffer.frameLength == 0 {
+                        idlePolls += 1
+                        if idlePolls >= maxIdlePolls { break renderLoop }
+                        continue
+                    }
+                    idlePolls = 0
+                    try outputFile.write(from: renderBuffer)
+                    renderedFrames += AVAudioFramePosition(renderBuffer.frameLength)
+                    progress?(RenderProgress(renderedFrames: renderedFrames, totalFrames: targetFrames))
+                case .insufficientDataFromInputNode, .cannotDoInCurrentContext:
                     idlePolls += 1
                     if idlePolls >= maxIdlePolls { break renderLoop }
                     continue
+                case .error:
+                    throw PntBpmError.renderFailed("AVAudioEngine manual render returned an error")
+                @unknown default:
+                    throw PntBpmError.renderFailed("AVAudioEngine manual render returned an unknown status")
                 }
-                idlePolls = 0
-                try outputFile.write(from: renderBuffer)
-                renderedFrames += AVAudioFramePosition(renderBuffer.frameLength)
-                progress?(RenderProgress(renderedFrames: renderedFrames, totalFrames: targetFrames))
-            case .insufficientDataFromInputNode, .cannotDoInCurrentContext:
-                idlePolls += 1
-                if idlePolls >= maxIdlePolls { break renderLoop }
-                continue
-            case .error:
-                throw PntBpmError.renderFailed("AVAudioEngine manual render returned an error")
-            @unknown default:
-                throw PntBpmError.renderFailed("AVAudioEngine manual render returned an unknown status")
             }
         }
 
         player.stop()
         engine.stop()
+
+        do {
+            try TrackMetadataCopier().copy(from: plan.input, to: plan.outputURL, targetBPM: plan.target)
+        } catch {
+            // Keep render output atomic: if metadata copy fails, don't leave a
+            // partially-tagged file on disk while reporting failure.
+            try? fileManager.removeItem(at: plan.outputURL)
+            throw error
+        }
 
         return RenderResult(
             outputURL: plan.outputURL,

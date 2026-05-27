@@ -123,6 +123,10 @@ Overwrite existing output files:
 pnt-bpm song.aiff --source 120 --target 125,128 --overwrite
 ```
 
+Rendered WAVs automatically copy source track metadata and artwork when
+present. If the source metadata includes a BPM field, the copied metadata
+is updated to match each target BPM.
+
 Show detailed render ratios and progress:
 
 ```sh
