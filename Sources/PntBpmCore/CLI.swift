@@ -8,8 +8,8 @@ public enum Command: Equatable {
 }
 
 public struct RenderOptions: Equatable {
-    public var input: URL
-    /// Source BPM. nil means "auto-detect from the input file".
+    public var inputs: [URL]
+    /// Source BPM applied to every input. nil means "auto-detect per input".
     public var source: BPM?
     public var targets: [BPM]
     public var outDir: URL?
@@ -20,6 +20,36 @@ public struct RenderOptions: Equatable {
     public var verbose: Bool
     public var gain: Float
     public var tailMilliseconds: Double
+
+    public var input: URL {
+        inputs[0]
+    }
+
+    public init(
+        inputs: [URL],
+        source: BPM?,
+        targets: [BPM],
+        outDir: URL? = nil,
+        format: String = "wav",
+        nameTemplate: String = "{title}_{bpm}bpm.{ext}",
+        overwrite: Bool = false,
+        dryRun: Bool = false,
+        verbose: Bool = false,
+        gain: Float = 1.0,
+        tailMilliseconds: Double = 0
+    ) {
+        self.inputs = inputs
+        self.source = source
+        self.targets = targets
+        self.outDir = outDir
+        self.format = format
+        self.nameTemplate = nameTemplate
+        self.overwrite = overwrite
+        self.dryRun = dryRun
+        self.verbose = verbose
+        self.gain = gain
+        self.tailMilliseconds = tailMilliseconds
+    }
 
     public init(
         input: URL,
@@ -34,17 +64,19 @@ public struct RenderOptions: Equatable {
         gain: Float = 1.0,
         tailMilliseconds: Double = 0
     ) {
-        self.input = input
-        self.source = source
-        self.targets = targets
-        self.outDir = outDir
-        self.format = format
-        self.nameTemplate = nameTemplate
-        self.overwrite = overwrite
-        self.dryRun = dryRun
-        self.verbose = verbose
-        self.gain = gain
-        self.tailMilliseconds = tailMilliseconds
+        self.init(
+            inputs: [input],
+            source: source,
+            targets: targets,
+            outDir: outDir,
+            format: format,
+            nameTemplate: nameTemplate,
+            overwrite: overwrite,
+            dryRun: dryRun,
+            verbose: verbose,
+            gain: gain,
+            tailMilliseconds: tailMilliseconds
+        )
     }
 }
 
@@ -55,7 +87,7 @@ public struct CLIParser {
             return .help
         }
 
-        var inputPath: String?
+        var inputPaths: [String] = []
         var sourceRaw: String?
         var targetRaw: [String] = []
         var outDirPath: String?
@@ -83,6 +115,8 @@ public struct CLIParser {
                 return .version
             case "--doctor":
                 return .doctor(verbose: verbose || args.contains("--verbose"))
+            case "-i", "--input":
+                inputPaths.append(try popValue(after: arg))
             case "-s", "--source":
                 sourceRaw = try popValue(after: arg)
             case "-t", "--target", "--output":
@@ -115,14 +149,11 @@ public struct CLIParser {
                 if arg.hasPrefix("-") {
                     throw PntBpmError.invalidOption(arg)
                 }
-                guard inputPath == nil else {
-                    throw PntBpmError.usage("only one input audio file can be provided")
-                }
-                inputPath = arg
+                inputPaths.append(arg)
             }
         }
 
-        guard let inputPath else {
+        guard !inputPaths.isEmpty else {
             throw PntBpmError.missingInput
         }
 
@@ -138,10 +169,11 @@ public struct CLIParser {
 
         let targets = try parseBPMList(targetRaw)
         let outDir = outDirPath.map { URL(fileURLWithPath: $0) }
+        let inputs = inputPaths.map { URL(fileURLWithPath: $0) }
 
         return .render(
             RenderOptions(
-                input: URL(fileURLWithPath: inputPath),
+                inputs: inputs,
                 source: source,
                 targets: targets,
                 outDir: outDir,
@@ -164,16 +196,19 @@ pnt-bpm \(pntBpmVersion)
 Batch tempo-change songs with Serato Pitch n Time LE.
 
 USAGE:
-  pnt-bpm <INPUT> [--source <BPM>] --target <BPM[,BPM...]> [OPTIONS]
+  pnt-bpm <INPUT> [INPUT...] [--source <BPM>] --target <BPM[,BPM...]> [OPTIONS]
 
 EXAMPLES:
   pnt-bpm song.wav --source 128 --target 125,122,120
   pnt-bpm song.wav --target 125,122,120                 # auto-detect source BPM
+  pnt-bpm a.wav b.wav c.aiff --source 128 --target 125,122
+  pnt-bpm -i a.wav -i b.wav --source 128 --target 125,122
   pnt-bpm song.aiff --source 120 --target 125,128 --out-dir renders
 
 ARGUMENTS:
-  <INPUT>
-      Input audio file readable by macOS, such as WAV, AIFF, CAF, MP3, or M4A.
+  <INPUT> [INPUT...]
+      One or more input audio files readable by macOS, such as WAV, AIFF,
+      CAF, MP3, or M4A. Every input is rendered at every target BPM.
 
 REQUIRED:
   -t, --target <BPM[,BPM...]>
@@ -182,13 +217,18 @@ REQUIRED:
   --output <BPM[,BPM...]>
       Alias for --target.
 
+INPUTS:
+  -i, --input <FILE>
+      Add an input file. Can be repeated. Combined with positional inputs.
+
 SOURCE:
   -s, --source <BPM>
-      Source tempo of the input song. If omitted, pnt-bpm tries to detect
-      it from Beatport-purchased tracks only — either the ID3 TBPM frame
-      embedded in the file's metadata, or the BPM slot in Beatport's
-      filename convention ("..._(Mix)__<BPM>__<Key>.aiff"). If neither
-      is present, pnt-bpm errors out rather than guessing.
+      Source tempo applied to every input file. If omitted, pnt-bpm tries
+      to detect it per input from Beatport-purchased tracks only — either
+      the ID3 TBPM frame embedded in the file's metadata, or the BPM slot
+      in Beatport's filename convention ("..._(Mix)__<BPM>__<Key>.aiff").
+      If neither is present for any input, pnt-bpm errors out rather than
+      guessing.
 
 OUTPUT:
   -d, --out-dir <DIR>

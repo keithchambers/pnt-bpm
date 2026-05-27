@@ -10,6 +10,7 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
     case invalidOption(String)
     case unsupportedFormat(String)
     case outputExists(URL)
+    case outputCollision(URL)
     case audioUnitNotFound
     case audioUnitInstantiateFailed(String)
     case missingAudioUnitParameter(String)
@@ -35,6 +36,8 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
             return "unsupported output format: \(format)"
         case .outputExists(let url):
             return "output already exists: \(url.path) (use --overwrite to replace it)"
+        case .outputCollision(let url):
+            return "multiple inputs would write to the same output: \(url.path) (use --name-template or --out-dir to disambiguate)"
         case .audioUnitNotFound:
             return "Serato Pitch n Time LE Audio Unit was not found"
         case .audioUnitInstantiateFailed(let reason):

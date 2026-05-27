@@ -71,6 +71,148 @@ import Testing
     }
 }
 
+@Test func parsesMultiplePositionalInputs() throws {
+    let command = try CLIParser.parse([
+        "pnt-bpm",
+        "a.wav",
+        "b.aiff",
+        "c.wav",
+        "--source",
+        "128",
+        "--target",
+        "125,122"
+    ])
+
+    guard case .render(let options) = command else {
+        Issue.record("expected render command")
+        return
+    }
+
+    #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.aiff", "c.wav"])
+    #expect(options.targets.map(\.value) == [125, 122])
+}
+
+@Test func parsesRepeatedInputFlag() throws {
+    let command = try CLIParser.parse([
+        "pnt-bpm",
+        "-i",
+        "a.wav",
+        "--input",
+        "b.wav",
+        "c.wav",
+        "--source",
+        "128",
+        "--target",
+        "125"
+    ])
+
+    guard case .render(let options) = command else {
+        Issue.record("expected render command")
+        return
+    }
+
+    #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.wav", "c.wav"])
+}
+
+@Test func renderOptionsKeepsSingleInputInitializerCompatibility() throws {
+    let options = RenderOptions(
+        input: URL(fileURLWithPath: "/tmp/song.wav"),
+        source: try BPM(128),
+        targets: [try BPM(125)]
+    )
+
+    #expect(options.input.path == "/tmp/song.wav")
+    #expect(options.inputs.map(\.path) == ["/tmp/song.wav"])
+}
+
+@Test func multiInputPlansFanOutOverInputsAndTargets() throws {
+    let plans = try OutputPlanner.plans(
+        inputs: [
+            URL(fileURLWithPath: "/tmp/a.wav"),
+            URL(fileURLWithPath: "/tmp/b.aiff")
+        ],
+        source: try BPM(120),
+        targets: [try BPM(125), try BPM(128)],
+        outDir: nil,
+        format: "wav",
+        nameTemplate: "{title}_{bpm}bpm.{ext}"
+    )
+
+    #expect(plans.map { $0.outputURL.path } == [
+        "/tmp/a_125bpm.wav",
+        "/tmp/a_128bpm.wav",
+        "/tmp/b_125bpm.wav",
+        "/tmp/b_128bpm.wav"
+    ])
+}
+
+@Test func multiInputPlansSupportPerInputSource() throws {
+    let plans = try OutputPlanner.plans(
+        inputs: [
+            (URL(fileURLWithPath: "/tmp/a.wav"), try BPM(120)),
+            (URL(fileURLWithPath: "/tmp/b.aiff"), try BPM(128))
+        ],
+        targets: [try BPM(125)],
+        outDir: nil,
+        format: "wav",
+        nameTemplate: "{title}_{bpm}bpm.{ext}"
+    )
+
+    #expect(plans.map(\.source.value) == [120, 128])
+    #expect(plans.map { $0.outputURL.path } == [
+        "/tmp/a_125bpm.wav",
+        "/tmp/b_125bpm.wav"
+    ])
+}
+
+@Test func multiInputPlansShareOutDir() throws {
+    let plans = try OutputPlanner.plans(
+        inputs: [
+            URL(fileURLWithPath: "/songs/a.wav"),
+            URL(fileURLWithPath: "/other/b.wav")
+        ],
+        source: try BPM(120),
+        targets: [try BPM(125)],
+        outDir: URL(fileURLWithPath: "/renders"),
+        format: "wav",
+        nameTemplate: "{title}_{bpm}bpm.{ext}"
+    )
+
+    #expect(plans.map { $0.outputURL.path } == [
+        "/renders/a_125bpm.wav",
+        "/renders/b_125bpm.wav"
+    ])
+}
+
+@Test func rejectsCollidingOutputsAcrossInputs() {
+    #expect(throws: PntBpmError.outputCollision(URL(fileURLWithPath: "/renders/song_125bpm.wav"))) {
+        _ = try OutputPlanner.plans(
+            inputs: [
+                URL(fileURLWithPath: "/a/song.wav"),
+                URL(fileURLWithPath: "/b/song.aiff")
+            ],
+            source: try BPM(120),
+            targets: [try BPM(125)],
+            outDir: URL(fileURLWithPath: "/renders"),
+            format: "wav",
+            nameTemplate: "{title}_{bpm}bpm.{ext}"
+        )
+    }
+}
+
+@Test func rejectsEmptyInputs() {
+    #expect(throws: PntBpmError.missingInput) {
+        _ = try OutputPlanner.plans(
+            inputs: [],
+            source: try BPM(120),
+            targets: [try BPM(125)],
+            outDir: nil,
+            format: "wav",
+            nameTemplate: "{title}_{bpm}bpm.{ext}"
+        )
+    }
+}
+
 @Test func rejectsUnsupportedFormat() throws {
     #expect(throws: PntBpmError.unsupportedFormat("mp3")) {
         _ = try OutputPlanner.plans(

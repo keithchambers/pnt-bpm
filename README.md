@@ -103,6 +103,31 @@ Render multiple target BPMs:
 pnt-bpm song.wav --source 120 --target 125,128
 ```
 
+Render multiple source files at the same target BPMs in a single run. Every
+input is warped to every target, so the command below produces six files
+(three inputs × two targets):
+
+```sh
+pnt-bpm a.wav b.wav c.aiff --source 120 --target 125,128
+```
+
+When `--source` is omitted with multiple inputs, the source BPM is detected
+independently for each file — so a batch of Beatport tracks at different
+tempos can be rendered to a shared target in one invocation:
+
+```sh
+pnt-bpm "Artist_A_Track_A_(Original_Mix)__125__G_Minor.aiff" \
+  "Artist_B_Track_B_(Extended_Mix)__128__A_Minor.aiff" \
+  --target 124
+```
+
+Inputs can also be passed via repeated `-i`/`--input` flags, which is handy
+when paths contain spaces or come from another command:
+
+```sh
+pnt-bpm -i "track one.wav" -i "track two.wav" --source 120 --target 125,128
+```
+
 `--output` is accepted as an alias for `--target`:
 
 ```sh
@@ -151,5 +176,10 @@ Use a custom output naming pattern:
 ```sh
 pnt-bpm song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm}.{ext}"
 ```
+
+When rendering multiple inputs into a shared `--out-dir`, `pnt-bpm` refuses
+to start if two inputs would write to the same output path (for example,
+two files both named `song` from different directories). Rename one of the
+inputs or render each one into its own directory to avoid the collision.
 
 The current release writes WAV output at the input sample rate and channel count.

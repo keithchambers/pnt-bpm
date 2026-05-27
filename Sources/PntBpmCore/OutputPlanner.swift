@@ -27,29 +27,79 @@ public struct OutputPlanner {
         format: String,
         nameTemplate: String
     ) throws -> [OutputPlan] {
+        try plans(
+            inputs: [(input, source)],
+            targets: targets,
+            outDir: outDir,
+            format: format,
+            nameTemplate: nameTemplate
+        )
+    }
+
+    public static func plans(
+        inputs: [URL],
+        source: BPM,
+        targets: [BPM],
+        outDir: URL?,
+        format: String,
+        nameTemplate: String
+    ) throws -> [OutputPlan] {
+        try plans(
+            inputs: inputs.map { ($0, source) },
+            targets: targets,
+            outDir: outDir,
+            format: format,
+            nameTemplate: nameTemplate
+        )
+    }
+
+    public static func plans(
+        inputs: [(URL, BPM)],
+        targets: [BPM],
+        outDir: URL?,
+        format: String,
+        nameTemplate: String
+    ) throws -> [OutputPlan] {
+        guard !inputs.isEmpty else {
+            throw PntBpmError.missingInput
+        }
+
         let normalizedFormat = format.lowercased()
         guard normalizedFormat == "wav" else {
             throw PntBpmError.unsupportedFormat(format)
         }
 
-        let directory = outDir ?? input.deletingLastPathComponent()
-        let title = input.deletingPathExtension().lastPathComponent
+        var plans: [OutputPlan] = []
+        var seenOutputs: Set<String> = []
 
-        return targets.map { target in
-            let filename = renderName(
-                template: nameTemplate,
-                title: title,
-                bpm: target.description,
-                ext: normalizedFormat
-            )
-            return OutputPlan(
-                input: input,
-                outputURL: directory.appendingPathComponent(filename),
-                source: source,
-                target: target,
-                format: normalizedFormat
-            )
+        for (input, source) in inputs {
+            let directory = outDir ?? input.deletingLastPathComponent()
+            let title = input.deletingPathExtension().lastPathComponent
+
+            for target in targets {
+                let filename = renderName(
+                    template: nameTemplate,
+                    title: title,
+                    bpm: target.description,
+                    ext: normalizedFormat
+                )
+                let outputURL = directory.appendingPathComponent(filename)
+                if !seenOutputs.insert(outputURL.standardizedFileURL.path).inserted {
+                    throw PntBpmError.outputCollision(outputURL)
+                }
+                plans.append(
+                    OutputPlan(
+                        input: input,
+                        outputURL: outputURL,
+                        source: source,
+                        target: target,
+                        format: normalizedFormat
+                    )
+                )
+            }
         }
+
+        return plans
     }
 
     public static func renderName(template: String, title: String, bpm: String, ext: String) -> String {
