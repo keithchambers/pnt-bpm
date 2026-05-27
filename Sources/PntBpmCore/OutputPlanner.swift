@@ -1,6 +1,6 @@
 import Foundation
 
-public struct OutputPlan: Equatable {
+public struct OutputPlan: Equatable, Sendable {
     public let input: URL
     public let outputURL: URL
     public let source: BPM

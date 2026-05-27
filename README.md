@@ -82,6 +82,10 @@ input is warped to every target, so the command below produces six files
 pnt-bpm a.wav b.wav c.aiff --source 120 --target 125,128
 ```
 
+Those planned renders run concurrently by default — `pnt-bpm` fans out across
+the active CPU count reported by macOS, and each job loads its own Pitch n'
+Time Audio Unit instance.
+
 When `--source` is omitted with multiple inputs, the source BPM is detected
 independently for each file — so a batch of Beatport tracks at different
 tempos can be rendered to a shared target in one invocation:
@@ -153,8 +157,9 @@ pnt-bpm song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm
 ```
 
 When rendering multiple inputs into a shared `--out-dir`, `pnt-bpm` refuses
-to start if two inputs would write to the same output path (for example,
-two files both named `song` from different directories). Rename one of the
-inputs or render each one into its own directory to avoid the collision.
+to start if two planned renders would write to the same output path (for
+example, two files both named `song` from different directories). This collision
+check runs before concurrent jobs start. Rename one of the inputs or render each
+one into its own directory to avoid the collision.
 
 The current release writes WAV output at the input sample rate and channel count.
