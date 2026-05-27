@@ -139,23 +139,18 @@ import Testing
     #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.wav", "c.wav"])
 }
 
-@Test func parsesCopyMetadataFlag() throws {
-    let command = try CLIParser.parse([
-        "pnt-bpm",
-        "song.wav",
-        "--source",
-        "128",
-        "--target",
-        "125",
-        "--copy-metadata"
-    ])
-
-    guard case .render(let options) = command else {
-        Issue.record("expected render command")
-        return
+@Test func rejectsCopyMetadataFlagBecauseMetadataCopyIsAutomatic() {
+    #expect(throws: PntBpmError.invalidOption("--copy-metadata")) {
+        _ = try CLIParser.parse([
+            "pnt-bpm",
+            "song.wav",
+            "--source",
+            "128",
+            "--target",
+            "125",
+            "--copy-metadata"
+        ])
     }
-
-    #expect(options.copyMetadata)
 }
 
 @Test func renderOptionsKeepsSingleInputInitializerCompatibility() throws {
@@ -272,7 +267,10 @@ import Testing
 
 @Test func sourceIsOptionalWhenAutoDetectIntended() throws {
     let command = try CLIParser.parse([
-        "pnt-bpm", "song.aiff", "--target", "125"
+        "pnt-bpm",
+        "song.aiff",
+        "--target",
+        "125"
     ])
     guard case .render(let options) = command else {
         Issue.record("expected render command")
@@ -328,7 +326,7 @@ import Testing
     #expect(detected == nil)
 }
 
-@Test func copiesID3MetadataAndArtworkToRenderedWAV() throws {
+@Test func copiesID3MetadataAndArtworkToRenderedWAVAndUpdatesBPM() throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -340,18 +338,71 @@ import Testing
     let id3Tag = makeID3v23Tag(frames: [
         makeID3v23TextFrame(id: "TIT2", value: "Source Track"),
         makeID3v23TextFrame(id: "TPE1", value: "Source Artist"),
-        makeID3v23TextFrame(id: "TBPM", value: "124"),
+        makeID3v23TextFrame(id: "TBPM", value: "99"),
         makeID3v23ArtworkFrame(mimeType: "image/jpeg", data: artwork)
     ])
 
     try makeAIFFWithID3Tag(id3Tag).write(to: source)
     try makeWAV().write(to: target)
 
-    let result = try TrackMetadataCopier().copy(from: source, to: target)
+    let result = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(128.5)
+    )
 
     #expect(result.didCopyMetadata)
     #expect(result.copiedChunks.contains("ID3 "))
-    #expect(riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) == id3Tag)
+
+    guard let copiedTag = riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied ID3 chunk")
+        return
+    }
+
+    #expect(copiedTag != id3Tag)
+    #expect(id3v23TextFrameValue(id: "TIT2", in: copiedTag) == "Source Track")
+    #expect(id3v23TextFrameValue(id: "TPE1", in: copiedTag) == "Source Artist")
+    #expect(id3v23TextFrameValue(id: "TBPM", in: copiedTag) == "128.5")
+
+    let copiedArtwork = id3v23FramePayload(id: "APIC", in: copiedTag).map {
+        Data($0.suffix(artwork.count))
+    }
+    #expect(copiedArtwork == artwork)
+}
+
+@Test func copiesRIFFInfoMetadataAndUpdatesBPM() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.wav")
+    let target = directory.appendingPathComponent("target.wav")
+    let infoList = makeRIFFInfoList([
+        ("INAM", "Source Track"),
+        ("IART", "Source Artist"),
+        ("IBPM", "99")
+    ])
+
+    try makeWAV(metadataChunks: [("LIST", infoList)]).write(to: source)
+    try makeWAV().write(to: target)
+
+    let result = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(127)
+    )
+
+    #expect(result.copiedChunks.contains("LIST"))
+
+    guard let copiedList = riffChunkData(id: "LIST", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied LIST chunk")
+        return
+    }
+
+    #expect(riffInfoValue(id: "INAM", in: copiedList) == "Source Track")
+    #expect(riffInfoValue(id: "IART", in: copiedList) == "Source Artist")
+    #expect(riffInfoValue(id: "IBPM", in: copiedList) == "127")
 }
 
 private func makeAIFFWithID3TBPM(_ bpm: String) -> Data {
@@ -387,7 +438,7 @@ private func makeAIFFWithID3Tag(_ id3Tag: Data) -> Data {
     return file
 }
 
-private func makeWAV() -> Data {
+private func makeWAV(metadataChunks: [(String, Data)] = []) -> Data {
     let fmtChunk = Data([
         0x01, 0x00, // PCM
         0x02, 0x00, // channel count
@@ -401,6 +452,9 @@ private func makeWAV() -> Data {
     var body = Data()
     body.appendASCII("WAVE")
     body.appendRIFFChunk(id: "fmt ", payload: fmtChunk)
+    for (id, payload) in metadataChunks {
+        body.appendRIFFChunk(id: id, payload: payload)
+    }
     body.appendRIFFChunk(id: "data", payload: dataChunk)
 
     var file = Data()
@@ -447,6 +501,17 @@ private func makeID3v23Tag(frames: [Data]) -> Data {
     return tag
 }
 
+private func makeRIFFInfoList(_ entries: [(String, String)]) -> Data {
+    var list = Data()
+    list.appendASCII("INFO")
+    for (id, value) in entries {
+        var payload = Data(value.utf8)
+        payload.append(0)
+        list.appendRIFFChunk(id: id, payload: payload)
+    }
+    return list
+}
+
 private func riffChunkData(id: String, in data: Data) -> Data? {
     guard data.count >= 12,
           String(bytes: data[0..<4], encoding: .ascii) == "RIFF",
@@ -465,6 +530,80 @@ private func riffChunkData(id: String, in data: Data) -> Data? {
             return Data(data[payloadStart..<payloadEnd])
         }
         offset = payloadEnd + (chunkSize % 2)
+    }
+
+    return nil
+}
+
+private func riffInfoValue(id: String, in listData: Data) -> String? {
+    guard listData.count >= 4,
+          String(bytes: listData[0..<4], encoding: .ascii) == "INFO" else {
+        return nil
+    }
+
+    var offset = 4
+    while offset + 8 <= listData.count {
+        let chunkID = String(bytes: listData[offset..<(offset + 4)], encoding: .ascii)
+        let chunkSize = Int(listData.uint32LE(at: offset + 4))
+        let payloadStart = offset + 8
+        let payloadEnd = payloadStart + chunkSize
+        guard payloadEnd <= listData.count else { return nil }
+
+        if chunkID == id {
+            let payload = listData[payloadStart..<payloadEnd]
+            let trimmed = payload.last == 0 ? payload.dropLast() : payload
+            return String(bytes: trimmed, encoding: .utf8)
+        }
+
+        offset = payloadEnd + (chunkSize % 2)
+    }
+
+    return nil
+}
+
+private func id3v23TextFrameValue(id: String, in tag: Data) -> String? {
+    guard let payload = id3v23FramePayload(id: id, in: tag),
+          let encoding = payload.first else {
+        return nil
+    }
+
+    let valueData = payload.dropFirst()
+    switch encoding {
+    case 0x00, 0x03:
+        return String(bytes: valueData, encoding: .utf8)
+    default:
+        return nil
+    }
+}
+
+private func id3v23FramePayload(id: String, in tag: Data) -> Data? {
+    guard tag.count >= 10,
+          String(bytes: tag[0..<3], encoding: .ascii) == "ID3",
+          tag[3] == 0x03 else {
+        return nil
+    }
+
+    let bodyEnd = min(tag.count, 10 + Int(tag.synchsafeUInt32(at: 6)))
+    var offset = 10
+
+    while offset + 10 <= bodyEnd {
+        if tag[offset..<(offset + 10)].allSatisfy({ $0 == 0 }) {
+            return nil
+        }
+
+        let frameID = String(bytes: tag[offset..<(offset + 4)], encoding: .ascii)
+        let frameSize = Int(tag.uint32BE(at: offset + 4))
+        let payloadStart = offset + 10
+        let payloadEnd = payloadStart + frameSize
+        guard payloadEnd <= bodyEnd else {
+            return nil
+        }
+
+        if frameID == id {
+            return Data(tag[payloadStart..<payloadEnd])
+        }
+
+        offset = payloadEnd
     }
 
     return nil
@@ -524,5 +663,19 @@ private extension Data {
             (UInt32(self[offset + 1]) << 8) |
             (UInt32(self[offset + 2]) << 16) |
             (UInt32(self[offset + 3]) << 24)
+    }
+
+    func uint32BE(at offset: Int) -> UInt32 {
+        (UInt32(self[offset]) << 24) |
+            (UInt32(self[offset + 1]) << 16) |
+            (UInt32(self[offset + 2]) << 8) |
+            UInt32(self[offset + 3])
+    }
+
+    func synchsafeUInt32(at offset: Int) -> UInt32 {
+        (UInt32(self[offset]) << 21) |
+            (UInt32(self[offset + 1]) << 14) |
+            (UInt32(self[offset + 2]) << 7) |
+            UInt32(self[offset + 3])
     }
 }
