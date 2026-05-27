@@ -139,6 +139,25 @@ import Testing
     #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.wav", "c.wav"])
 }
 
+@Test func parsesCopyMetadataFlag() throws {
+    let command = try CLIParser.parse([
+        "pnt-bpm",
+        "song.wav",
+        "--source",
+        "128",
+        "--target",
+        "125",
+        "--copy-metadata"
+    ])
+
+    guard case .render(let options) = command else {
+        Issue.record("expected render command")
+        return
+    }
+
+    #expect(options.copyMetadata)
+}
+
 @Test func renderOptionsKeepsSingleInputInitializerCompatibility() throws {
     let options = RenderOptions(
         input: URL(fileURLWithPath: "/tmp/song.wav"),
@@ -309,8 +328,40 @@ import Testing
     #expect(detected == nil)
 }
 
+@Test func copiesID3MetadataAndArtworkToRenderedWAV() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.aiff")
+    let target = directory.appendingPathComponent("target.wav")
+    let artwork = Data([0xff, 0xd8, 0xff, 0xd9])
+    let id3Tag = makeID3v23Tag(frames: [
+        makeID3v23TextFrame(id: "TIT2", value: "Source Track"),
+        makeID3v23TextFrame(id: "TPE1", value: "Source Artist"),
+        makeID3v23TextFrame(id: "TBPM", value: "124"),
+        makeID3v23ArtworkFrame(mimeType: "image/jpeg", data: artwork)
+    ])
+
+    try makeAIFFWithID3Tag(id3Tag).write(to: source)
+    try makeWAV().write(to: target)
+
+    let result = try TrackMetadataCopier().copy(from: source, to: target)
+
+    #expect(result.didCopyMetadata)
+    #expect(result.copiedChunks.contains("ID3 "))
+    #expect(riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) == id3Tag)
+}
+
 private func makeAIFFWithID3TBPM(_ bpm: String) -> Data {
-    let id3Tag = makeID3v23TBPMTag(bpm)
+    let id3Tag = makeID3v23Tag(frames: [
+        makeID3v23TextFrame(id: "TBPM", value: bpm)
+    ])
+    return makeAIFFWithID3Tag(id3Tag)
+}
+
+private func makeAIFFWithID3Tag(_ id3Tag: Data) -> Data {
     let commonChunk = Data([
         0x00, 0x02, // channel count
         0x00, 0x00, 0x00, 0x01, // sample frame count
@@ -336,22 +387,87 @@ private func makeAIFFWithID3TBPM(_ bpm: String) -> Data {
     return file
 }
 
-private func makeID3v23TBPMTag(_ bpm: String) -> Data {
-    var text = Data([0x00])
-    text.append(contentsOf: bpm.utf8)
+private func makeWAV() -> Data {
+    let fmtChunk = Data([
+        0x01, 0x00, // PCM
+        0x02, 0x00, // channel count
+        0x44, 0xac, 0x00, 0x00, // sample rate: 44100
+        0x10, 0xb1, 0x02, 0x00, // byte rate: 176400
+        0x04, 0x00, // block align
+        0x10, 0x00 // bits per sample
+    ])
+    let dataChunk = Data([0x00, 0x00, 0x00, 0x00])
 
+    var body = Data()
+    body.appendASCII("WAVE")
+    body.appendRIFFChunk(id: "fmt ", payload: fmtChunk)
+    body.appendRIFFChunk(id: "data", payload: dataChunk)
+
+    var file = Data()
+    file.appendASCII("RIFF")
+    file.appendUInt32LE(UInt32(body.count))
+    file.append(body)
+    return file
+}
+
+private func makeID3v23TextFrame(id: String, value: String) -> Data {
+    var payload = Data([0x00])
+    payload.append(contentsOf: value.utf8)
+    return makeID3v23Frame(id: id, payload: payload)
+}
+
+private func makeID3v23ArtworkFrame(mimeType: String, data: Data) -> Data {
+    var payload = Data([0x00])
+    payload.append(contentsOf: mimeType.utf8)
+    payload.append(0x00)
+    payload.append(0x03) // front cover
+    payload.append(0x00) // empty description
+    payload.append(data)
+    return makeID3v23Frame(id: "APIC", payload: payload)
+}
+
+private func makeID3v23Frame(id: String, payload: Data) -> Data {
     var frame = Data()
-    frame.appendASCII("TBPM")
-    frame.appendUInt32BE(UInt32(text.count))
+    frame.appendASCII(id)
+    frame.appendUInt32BE(UInt32(payload.count))
     frame.appendUInt16BE(0)
-    frame.append(text)
+    frame.append(payload)
+    return frame
+}
 
+private func makeID3v23Tag(frames: [Data]) -> Data {
+    let frameData = frames.reduce(into: Data()) { result, frame in
+        result.append(frame)
+    }
     var tag = Data()
     tag.appendASCII("ID3")
     tag.append(contentsOf: [0x03, 0x00, 0x00])
-    tag.appendSynchsafeUInt32(UInt32(frame.count))
-    tag.append(frame)
+    tag.appendSynchsafeUInt32(UInt32(frameData.count))
+    tag.append(frameData)
     return tag
+}
+
+private func riffChunkData(id: String, in data: Data) -> Data? {
+    guard data.count >= 12,
+          String(bytes: data[0..<4], encoding: .ascii) == "RIFF",
+          String(bytes: data[8..<12], encoding: .ascii) == "WAVE" else {
+        return nil
+    }
+
+    var offset = 12
+    while offset + 8 <= data.count {
+        let chunkID = String(bytes: data[offset..<(offset + 4)], encoding: .ascii)
+        let chunkSize = Int(data.uint32LE(at: offset + 4))
+        let payloadStart = offset + 8
+        let payloadEnd = payloadStart + chunkSize
+        guard payloadEnd <= data.count else { return nil }
+        if chunkID == id {
+            return Data(data[payloadStart..<payloadEnd])
+        }
+        offset = payloadEnd + (chunkSize % 2)
+    }
+
+    return nil
 }
 
 private extension Data {
@@ -368,9 +484,25 @@ private extension Data {
         }
     }
 
+    mutating func appendRIFFChunk(id: String, payload: Data) {
+        appendASCII(id)
+        appendUInt32LE(UInt32(payload.count))
+        append(payload)
+        if payload.count % 2 == 1 {
+            append(0)
+        }
+    }
+
     mutating func appendUInt16BE(_ value: UInt16) {
         append(UInt8((value >> 8) & 0xff))
         append(UInt8(value & 0xff))
+    }
+
+    mutating func appendUInt32LE(_ value: UInt32) {
+        append(UInt8(value & 0xff))
+        append(UInt8((value >> 8) & 0xff))
+        append(UInt8((value >> 16) & 0xff))
+        append(UInt8((value >> 24) & 0xff))
     }
 
     mutating func appendUInt32BE(_ value: UInt32) {
@@ -385,5 +517,12 @@ private extension Data {
         append(UInt8((value >> 14) & 0x7f))
         append(UInt8((value >> 7) & 0x7f))
         append(UInt8(value & 0x7f))
+    }
+
+    func uint32LE(at offset: Int) -> UInt32 {
+        UInt32(self[offset]) |
+            (UInt32(self[offset + 1]) << 8) |
+            (UInt32(self[offset + 2]) << 16) |
+            (UInt32(self[offset + 3]) << 24)
     }
 }

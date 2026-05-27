@@ -92,7 +92,8 @@ func run() throws {
                 plan: plan,
                 overwrite: options.overwrite,
                 gain: options.gain,
-                tailMilliseconds: options.tailMilliseconds
+                tailMilliseconds: options.tailMilliseconds,
+                copyMetadata: options.copyMetadata
             ) { progress in
                 guard options.verbose else { return }
                 let bucket = Int((progress.fraction * 100).rounded(.down))

@@ -41,6 +41,7 @@ public final class PitchNTimeRenderer {
         overwrite: Bool,
         gain: Float,
         tailMilliseconds: Double,
+        copyMetadata: Bool = false,
         progress: ((RenderProgress) -> Void)? = nil
     ) throws -> RenderResult {
         if fileManager.fileExists(atPath: plan.outputURL.path) {
@@ -140,6 +141,10 @@ public final class PitchNTimeRenderer {
 
         player.stop()
         engine.stop()
+
+        if copyMetadata {
+            try TrackMetadataCopier().copy(from: plan.input, to: plan.outputURL)
+        }
 
         return RenderResult(
             outputURL: plan.outputURL,

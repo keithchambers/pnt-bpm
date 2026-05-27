@@ -12,6 +12,7 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
     case unsupportedFormat(String)
     case outputExists(URL)
     case outputCollision(URL)
+    case metadataCopyFailed(URL, URL, String)
     case audioUnitNotFound
     case audioUnitInstantiateFailed(String)
     case missingAudioUnitParameter(String)
@@ -41,6 +42,8 @@ public enum PntBpmError: Error, CustomStringConvertible, Equatable {
             return "output already exists: \(url.path) (use --overwrite to replace it)"
         case .outputCollision(let url):
             return "multiple inputs would write to the same output: \(url.path) (use --name-template or --out-dir to disambiguate)"
+        case .metadataCopyFailed(let source, let target, let reason):
+            return "could not copy metadata from \(source.lastPathComponent) to \(target.lastPathComponent): \(reason)"
         case .audioUnitNotFound:
             return "Serato Pitch n Time LE Audio Unit was not found"
         case .audioUnitInstantiateFailed(let reason):

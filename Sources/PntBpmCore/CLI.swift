@@ -16,6 +16,7 @@ public struct RenderOptions: Equatable {
     public var format: String
     public var nameTemplate: String
     public var overwrite: Bool
+    public var copyMetadata: Bool
     public var dryRun: Bool
     public var verbose: Bool
     public var gain: Float
@@ -33,6 +34,7 @@ public struct RenderOptions: Equatable {
         format: String = "wav",
         nameTemplate: String = "{title}_{bpm}bpm.{ext}",
         overwrite: Bool = false,
+        copyMetadata: Bool = false,
         dryRun: Bool = false,
         verbose: Bool = false,
         gain: Float = 1.0,
@@ -45,6 +47,7 @@ public struct RenderOptions: Equatable {
         self.format = format
         self.nameTemplate = nameTemplate
         self.overwrite = overwrite
+        self.copyMetadata = copyMetadata
         self.dryRun = dryRun
         self.verbose = verbose
         self.gain = gain
@@ -59,6 +62,7 @@ public struct RenderOptions: Equatable {
         format: String = "wav",
         nameTemplate: String = "{title}_{bpm}bpm.{ext}",
         overwrite: Bool = false,
+        copyMetadata: Bool = false,
         dryRun: Bool = false,
         verbose: Bool = false,
         gain: Float = 1.0,
@@ -72,6 +76,7 @@ public struct RenderOptions: Equatable {
             format: format,
             nameTemplate: nameTemplate,
             overwrite: overwrite,
+            copyMetadata: copyMetadata,
             dryRun: dryRun,
             verbose: verbose,
             gain: gain,
@@ -94,6 +99,7 @@ public struct CLIParser {
         var format = "wav"
         var nameTemplate = "{title}_{bpm}bpm.{ext}"
         var overwrite = false
+        var copyMetadata = false
         var dryRun = false
         var verbose = false
         var gain: Float = 1.0
@@ -129,6 +135,8 @@ public struct CLIParser {
                 nameTemplate = try popValue(after: arg)
             case "--overwrite":
                 overwrite = true
+            case "--copy-metadata":
+                copyMetadata = true
             case "--dry-run":
                 dryRun = true
             case "--verbose":
@@ -181,6 +189,7 @@ public struct CLIParser {
                 format: format,
                 nameTemplate: nameTemplate,
                 overwrite: overwrite,
+                copyMetadata: copyMetadata,
                 dryRun: dryRun,
                 verbose: verbose,
                 gain: gain,
@@ -251,6 +260,10 @@ OUTPUT:
 
   --overwrite
       Replace existing files.
+
+  --copy-metadata
+      Copy track metadata chunks from each source file to rendered targets,
+      including ID3 metadata and embedded artwork when present.
 
 SERATO:
   --gain <VALUE>
