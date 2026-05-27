@@ -79,7 +79,7 @@ If you omit `--source`, `pnt-bpm` will try to read the BPM from a
 Beatport-purchased track in one of two ways:
 
 1. **ID3 `TBPM` frame** embedded in the file's metadata (Beatport
-   typically writes this as an `id3 ` chunk at the tail of the AIFF, and
+   typically writes this as an `ID3 ` chunk at the tail of the AIFF, and
    in the ID3v2 header of the MP3 download).
 2. **Beatport filename slot** — the BPM that sits between double
    underscores in Beatport's naming convention,

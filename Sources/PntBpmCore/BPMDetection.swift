@@ -16,7 +16,7 @@ public struct DetectedBPM: Equatable, Sendable {
 /// omits `--source`. Beatport stores BPM in exactly two places:
 ///
 ///   1. An ID3v2 `TBPM` frame, embedded in the file's metadata
-///      (an `id3 ` chunk at the tail of an AIFF, or the ID3v2 header
+///      (an `ID3 ` chunk at the tail of an AIFF, or the ID3v2 header
 ///      of an MP3 download).
 ///   2. The filename, between double underscores:
 ///      `Artist_Title_(Mix)__<BPM>__<Key>.aiff`.

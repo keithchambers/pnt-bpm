@@ -103,6 +103,22 @@ import Testing
     #expect(bpm?.value == 125)
 }
 
+@Test func detectsAIFFID3TBPMBeforeFilenameFallback() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let url = directory.appendingPathComponent(
+        "Andrew_Meller_Bee_(Original_Mix)__17628366__Bb_Minor.aiff"
+    )
+    try makeAIFFWithID3TBPM("124").write(to: url)
+
+    let detected = SourceBPMDetector().detect(input: url)
+    #expect(detected?.bpm == (try BPM(124)))
+    #expect(detected?.source == "id3 TBPM")
+}
+
 @Test func ignoresBeatportTrackIdInBPMSlot() {
     // Older Beatport AIFFs used a 7–8 digit track ID in the same slot.
     let bpm = SourceBPMDetector.scanBeatportFilename(
@@ -124,4 +140,83 @@ import Testing
     let url = URL(fileURLWithPath: "/tmp/somefolder-mix-125/vocals.wav")
     let detected = SourceBPMDetector().detect(input: url)
     #expect(detected == nil)
+}
+
+private func makeAIFFWithID3TBPM(_ bpm: String) -> Data {
+    let id3Tag = makeID3v23TBPMTag(bpm)
+    let commonChunk = Data([
+        0x00, 0x02, // channel count
+        0x00, 0x00, 0x00, 0x01, // sample frame count
+        0x00, 0x10, // sample size
+        0x40, 0x0e, 0xac, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // 44100 Hz
+    ])
+    let soundChunk = Data([
+        0x00, 0x00, 0x00, 0x00, // offset
+        0x00, 0x00, 0x00, 0x00, // block size
+        0x00, 0x00, 0x00, 0x00 // one silent stereo frame
+    ])
+
+    var body = Data()
+    body.appendASCII("AIFF")
+    body.appendAIFFChunk(id: "COMM", payload: commonChunk)
+    body.appendAIFFChunk(id: "SSND", payload: soundChunk)
+    body.appendAIFFChunk(id: "ID3 ", payload: id3Tag)
+
+    var file = Data()
+    file.appendASCII("FORM")
+    file.appendUInt32BE(UInt32(body.count))
+    file.append(body)
+    return file
+}
+
+private func makeID3v23TBPMTag(_ bpm: String) -> Data {
+    var text = Data([0x00])
+    text.append(contentsOf: bpm.utf8)
+
+    var frame = Data()
+    frame.appendASCII("TBPM")
+    frame.appendUInt32BE(UInt32(text.count))
+    frame.appendUInt16BE(0)
+    frame.append(text)
+
+    var tag = Data()
+    tag.appendASCII("ID3")
+    tag.append(contentsOf: [0x03, 0x00, 0x00])
+    tag.appendSynchsafeUInt32(UInt32(frame.count))
+    tag.append(frame)
+    return tag
+}
+
+private extension Data {
+    mutating func appendASCII(_ string: String) {
+        append(contentsOf: string.utf8)
+    }
+
+    mutating func appendAIFFChunk(id: String, payload: Data) {
+        appendASCII(id)
+        appendUInt32BE(UInt32(payload.count))
+        append(payload)
+        if payload.count % 2 == 1 {
+            append(0)
+        }
+    }
+
+    mutating func appendUInt16BE(_ value: UInt16) {
+        append(UInt8((value >> 8) & 0xff))
+        append(UInt8(value & 0xff))
+    }
+
+    mutating func appendUInt32BE(_ value: UInt32) {
+        append(UInt8((value >> 24) & 0xff))
+        append(UInt8((value >> 16) & 0xff))
+        append(UInt8((value >> 8) & 0xff))
+        append(UInt8(value & 0xff))
+    }
+
+    mutating func appendSynchsafeUInt32(_ value: UInt32) {
+        append(UInt8((value >> 21) & 0x7f))
+        append(UInt8((value >> 14) & 0x7f))
+        append(UInt8((value >> 7) & 0x7f))
+        append(UInt8(value & 0x7f))
+    }
 }
