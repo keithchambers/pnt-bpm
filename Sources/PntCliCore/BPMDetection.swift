@@ -59,7 +59,7 @@ public struct SourceBPMDetector {
               isPlausible(value) else {
             return nil
         }
-        return try? BPM(value)
+        return try? BPM(String(string[captureRange]))
     }
 
     static func isPlausible(_ value: Double) -> Bool {
@@ -106,7 +106,7 @@ public struct SourceBPMDetector {
         if let string = try await item.load(.stringValue),
            let number = Double(string.trimmingCharacters(in: .whitespacesAndNewlines)),
            isPlausible(number) {
-            return try? BPM(number)
+            return try? BPM(string)
         }
         return nil
     }

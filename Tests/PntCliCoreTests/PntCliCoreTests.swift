@@ -67,6 +67,13 @@ import Testing
     #expect(abs(ratios.outputDurationRatio - 0.9375) < 0.0000001)
 }
 
+@Test func outputFrameCountUsesExactDecimalBPMMath() throws {
+    let ratios = TempoRatios(source: try BPM("50.1"), target: try BPM("75.6"))
+
+    #expect(Int64((Double(44_100) * (50.1 / 75.6)).rounded(.up)) == 29_226)
+    #expect(try ratios.outputFrameCount(inputFrames: 44_100) == 29_225)
+}
+
 @Test func outputExtensionMatchesInput() throws {
     let input = URL(fileURLWithPath: "/tmp/song.aiff")
     let plans = try OutputPlanner.plans(

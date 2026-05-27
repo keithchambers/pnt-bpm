@@ -81,9 +81,8 @@ public final class PitchNTimeRenderer {
 
         let outputSettings = try linearPCMSettings(for: processingFormat)
         let tailFrames = AVAudioFramePosition((tailMilliseconds / 1000.0 * processingFormat.sampleRate).rounded(.up))
-        let targetFrames = AVAudioFramePosition(
-            (Double(inputFile.length) * plan.ratios.outputDurationRatio).rounded(.up)
-        ) + tailFrames
+        let outputFrames = try plan.ratios.outputFrameCount(inputFrames: inputFile.length)
+        let targetFrames = AVAudioFramePosition(outputFrames) + tailFrames
 
         guard let renderBuffer = AVAudioPCMBuffer(
             pcmFormat: engine.manualRenderingFormat,

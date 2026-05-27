@@ -104,10 +104,7 @@ public struct CLIParser {
 
         let source: BPM?
         if let sourceRaw {
-            guard let sourceValue = Double(sourceRaw) else {
-                throw PntCliError.invalidBPM(sourceRaw)
-            }
-            source = try BPM(sourceValue)
+            source = try BPM(sourceRaw)
         } else {
             source = nil
         }

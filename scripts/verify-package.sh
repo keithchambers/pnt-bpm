@@ -84,6 +84,7 @@ if [[ "${PNT_CLI_REQUIRE_SIGNED_BINARY:-0}" = "1" ]]; then
 
   entitlements_output="$(/usr/bin/codesign -d --entitlements :- "$binary" 2>/dev/null)"
   echo "$entitlements_output"
+  require_contains "$entitlements_output" "com.apple.security.cs.allow-unsigned-executable-memory" "Release binary entitlements"
   require_contains "$entitlements_output" "com.apple.security.cs.disable-library-validation" "Release binary entitlements"
 fi
 
