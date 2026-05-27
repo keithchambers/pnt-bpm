@@ -37,7 +37,7 @@ Apple ID and app-specific password:
 
 ```sh
 gh secret set APPLE_ID --repo keithchambers/pnt-bpm --body "djkeithchambers@gmail.com"
-gh secret set APPLE_TEAM_ID --repo keithchambers/pnt-bpm --body "6L4C5M8K2S"
+gh secret set APPLE_TEAM_ID --repo keithchambers/pnt-bpm --body "CV8ZPG47Q6"
 gh secret set APPLE_APP_SPECIFIC_PASSWORD --repo keithchambers/pnt-bpm
 ```
 
