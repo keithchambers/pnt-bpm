@@ -1,39 +1,28 @@
 <div align="center">
   <h1>pnt-cli</h1>
   <p><strong>Batch tempo-change audio files with Serato Pitch n' Time LE — no DAW required</strong></p>
-
-  <p>
-    <a href="https://github.com/keithchambers/pnt-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/keithchambers/pnt-cli/ci.yml?branch=main&label=build" alt="Build Status"></a>
-    <a href="https://github.com/keithchambers/pnt-cli/releases/latest"><img src="https://img.shields.io/github/v/release/keithchambers/pnt-cli?label=release" alt="Latest release"></a>
-    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey" alt="Platform: macOS 13+">
-  </p>
 </div>
 
 ## Overview
 
-Serato Pitch n' Time is the industry-standard pitch-shifting and time-stretching plugin for producers and DJs. It
+Serato Pitch n' Time (PnT) is the industry-standard pitch-shifting and time-stretching plugin for producers and DJs. It
 changes a track's tempo while preserving its pitch, avoiding the artifacts that cheaper time-stretch algorithms
-introduce. Serato ships Pitch n' Time as a plugin that only loads inside Logic Pro and Pro Tools, which turns one-off
-tempo changes into a multi-step ritual: launch a DAW, create a session, load the plugin, set the tempo, bounce,
-repeat.
+introduce.
 
-`pnt-cli` brings Pitch n' Time LE to the command line. It hosts the locally installed Pitch n' Time Audio Unit
-directly from a terminal, so a track — or a folder of tracks — can be rendered to one or more target BPMs in a single
-command. Source metadata and artwork are copied to each output, and the BPM tag is updated to match the target.
+Traditionally, PnT requires Logic Pro and Pro Tools, which is not automation friendly.
 
-`pnt-cli` is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Serato, and
-does not include Pitch n' Time — install and license Pitch n' Time LE separately.
+`pnt-cli` brings PnT to the command line. It hosts the locally installed Pitch n' Time Audio Unit directly from a
+terminal and enables parallel processing of multiple tracks for fast batch processing.
 
 ## Installation
 
-**Requirements:** macOS 13 or newer, with Serato Pitch n' Time LE installed locally.
+**Requirements:** macOS 13 or later with Serato Pitch n' Time LE 3.1.1 installed
 
 Download the latest signed installer and open it:
 
 [pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
 
-If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning and
-exits with status 1.
+_Note: If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning._
 
 ## Quick Start
 
@@ -58,4 +47,4 @@ pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
 # detects 125 BPM from the filename, then renders one file at 128 BPM
 ```
 
-Outputs keep the input's file format, sample rate, and channel count.
+Output tracks keep the input track's file format, sample rate, and channel count.
