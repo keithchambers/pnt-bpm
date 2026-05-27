@@ -10,6 +10,9 @@ prototypes/
 *.aif
 *.mp3
 *.m4a
+*.p12
+*.p8
+*.keychain-db
 history.md
 implementation-plan.md
 stem-separation-model-research.md
