@@ -73,6 +73,30 @@ Render one target BPM:
 pnt-bpm song.wav --source 120 --target 125
 ```
 
+### Auto-detecting the source BPM (Beatport only)
+
+If you omit `--source`, `pnt-bpm` will try to read the BPM from a
+Beatport-purchased track in one of two ways:
+
+1. **ID3 `TBPM` frame** embedded in the file's metadata (Beatport
+   typically writes this as an `ID3 ` chunk at the tail of the AIFF, and
+   in the ID3v2 header of the MP3 download).
+2. **Beatport filename slot** — the BPM that sits between double
+   underscores in Beatport's naming convention,
+   `Artist_Title_(Mix)__<BPM>__<Key>.aiff`.
+
+```sh
+# Either the ID3 TBPM frame or the __125__ slot in the filename works:
+pnt-bpm "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
+```
+
+Values outside 50–220 BPM are rejected — this filters out Beatport's
+older 7–8-digit track-IDs that occasionally appear in the same slot
+(`__17628366__`). Nothing else is attempted: there is no parent-directory
+walk, no generic metadata-key search, and no audio-content analysis. If
+neither source is present, `pnt-bpm` errors out and you should pass
+`--source <BPM>` explicitly.
+
 Render multiple target BPMs:
 
 ```sh

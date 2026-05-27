@@ -9,7 +9,8 @@ public enum Command: Equatable {
 
 public struct RenderOptions: Equatable {
     public var input: URL
-    public var source: BPM
+    /// Source BPM. nil means "auto-detect from the input file".
+    public var source: BPM?
     public var targets: [BPM]
     public var outDir: URL?
     public var format: String
@@ -22,7 +23,7 @@ public struct RenderOptions: Equatable {
 
     public init(
         input: URL,
-        source: BPM,
+        source: BPM?,
         targets: [BPM],
         outDir: URL? = nil,
         format: String = "wav",
@@ -124,14 +125,17 @@ public struct CLIParser {
         guard let inputPath else {
             throw PntBpmError.missingInput
         }
-        guard let sourceRaw else {
-            throw PntBpmError.missingSource
-        }
-        guard let sourceValue = Double(sourceRaw) else {
-            throw PntBpmError.invalidBPM(sourceRaw)
+
+        let source: BPM?
+        if let sourceRaw {
+            guard let sourceValue = Double(sourceRaw) else {
+                throw PntBpmError.invalidBPM(sourceRaw)
+            }
+            source = try BPM(sourceValue)
+        } else {
+            source = nil
         }
 
-        let source = try BPM(sourceValue)
         let targets = try parseBPMList(targetRaw)
         let outDir = outDirPath.map { URL(fileURLWithPath: $0) }
 
@@ -160,11 +164,11 @@ pnt-bpm \(pntBpmVersion)
 Batch tempo-change songs with Serato Pitch n Time LE.
 
 USAGE:
-  pnt-bpm <INPUT> --source <BPM> --target <BPM[,BPM...]> [OPTIONS]
+  pnt-bpm <INPUT> [--source <BPM>] --target <BPM[,BPM...]> [OPTIONS]
 
 EXAMPLES:
   pnt-bpm song.wav --source 128 --target 125,122,120
-  pnt-bpm song.wav --source 128 --output 125,122,120
+  pnt-bpm song.wav --target 125,122,120                 # auto-detect source BPM
   pnt-bpm song.aiff --source 120 --target 125,128 --out-dir renders
 
 ARGUMENTS:
@@ -172,14 +176,19 @@ ARGUMENTS:
       Input audio file readable by macOS, such as WAV, AIFF, CAF, MP3, or M4A.
 
 REQUIRED:
-  -s, --source <BPM>
-      Source tempo of the input song.
-
   -t, --target <BPM[,BPM...]>
       Target BPM values to render. Can be comma-separated or repeated.
 
   --output <BPM[,BPM...]>
       Alias for --target.
+
+SOURCE:
+  -s, --source <BPM>
+      Source tempo of the input song. If omitted, pnt-bpm tries to detect
+      it from Beatport-purchased tracks only — either the ID3 TBPM frame
+      embedded in the file's metadata, or the BPM slot in Beatport's
+      filename convention ("..._(Mix)__<BPM>__<Key>.aiff"). If neither
+      is present, pnt-bpm errors out rather than guessing.
 
 OUTPUT:
   -d, --out-dir <DIR>

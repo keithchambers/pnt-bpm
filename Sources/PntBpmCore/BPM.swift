@@ -1,6 +1,6 @@
 import Foundation
 
-public struct BPM: Equatable, Comparable, CustomStringConvertible {
+public struct BPM: Equatable, Comparable, Sendable, CustomStringConvertible {
     public let value: Double
 
     public init(_ value: Double) throws {

@@ -38,9 +38,24 @@ func run() throws {
         }
 
     case .render(let options):
+        let resolvedSource: BPM
+        if let provided = options.source {
+            resolvedSource = provided
+        } else {
+            guard let detected = SourceBPMDetector().detect(input: options.input) else {
+                throw PntBpmError.undetectableSource(options.input)
+            }
+            if options.verbose {
+                print("detected source BPM \(detected.bpm.description) from \(detected.source)")
+            } else {
+                print("source BPM \(detected.bpm.description) (auto-detected)")
+            }
+            resolvedSource = detected.bpm
+        }
+
         let plans = try OutputPlanner.plans(
             input: options.input,
-            source: options.source,
+            source: resolvedSource,
             targets: options.targets,
             outDir: options.outDir,
             format: options.format,
