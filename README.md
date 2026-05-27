@@ -45,10 +45,4 @@ pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
 # detects 125 BPM from the filename, then renders one file at 128 BPM
 ```
 
-Overwrite existing output files with `-o` or `--overwrite`:
-
-```sh
-pnt-cli song.wav --source 120 --target 125,128 -o
-```
-
 Output tracks keep the input track's file format, sample rate, and channel count.
