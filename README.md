@@ -9,7 +9,7 @@ Serato Pitch n' Time (PnT) is the industry-standard pitch-shifting and time-stre
 changes a track's tempo while preserving its pitch, avoiding the artifacts that cheaper time-stretch algorithms
 introduce.
 
-Traditionally, PnT requires Logic Pro and Pro Tools, which is not automation friendly.
+PnT requires Logic Pro and Pro Tools, which is not automation friendly.
 
 `pnt-cli` brings PnT to the command line. It hosts the locally installed Pitch n' Time Audio Unit directly from a
 terminal and enables parallel processing of multiple tracks for fast batch processing.
@@ -18,9 +18,7 @@ terminal and enables parallel processing of multiple tracks for fast batch proce
 
 **Requirements:** macOS 13 or later with Serato Pitch n' Time LE 3.1.1 installed
 
-Download the latest signed installer and open it:
-
-[pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
+Download the latest signed installer and open it: [pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
 
 _Note: If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints the help text followed by a warning._
 
