@@ -98,9 +98,17 @@ public struct TrackMetadataCopier {
             return []
         }
 
+        // `kAudioFilePropertyChunkIDs` can report one entry per chunk instance.
+        // Dedupe so we don't process the same chunk type more than once (which
+        // would duplicate every instance via AudioFileCountUserData).
         return data.withUnsafeBytes { rawBuffer in
             let ids = rawBuffer.bindMemory(to: UInt32.self)
-            return ids.filter { Self.copyableMetadataChunkIDs.contains($0) }
+            var seen: Set<UInt32> = []
+            var result: [UInt32] = []
+            for id in ids where Self.copyableMetadataChunkIDs.contains(id) && seen.insert(id).inserted {
+                result.append(id)
+            }
+            return result
         }
     }
 
@@ -221,6 +229,13 @@ public struct TrackMetadataCopier {
             return tag
         }
 
+        // Tag-level unsynchronisation rewrites byte values throughout the body
+        // (every 0xFF gains a trailing 0x00). Parsing frames without un-syncing
+        // would yield wrong frame sizes, so leave such tags untouched.
+        if tag[5] & 0x80 != 0 {
+            return tag
+        }
+
         let bodyStart = 10
         let bodyEnd = min(tag.count, bodyStart + Int(declaredBodySize))
         guard bodyEnd >= bodyStart else {
@@ -280,7 +295,16 @@ public struct TrackMetadataCopier {
             let payloadEnd = payloadStart + frameSize
             let payload = Data(tag[payloadStart..<payloadEnd])
 
-            if (version == 2 && frameID == "TBP") || (version != 2 && frameID == "TBPM") {
+            let isBPMFrame = (version == 2 && frameID == "TBP")
+                || (version != 2 && frameID == "TBPM")
+            // For v2.3/v2.4, only rewrite when both frame-flag bytes are zero
+            // — non-zero flags can indicate compression, encryption, grouping,
+            // or a data-length indicator that our plain-text replacement would
+            // silently invalidate.
+            let frameFlagsClear = version == 2
+                || (tag[cursor + 8] == 0 && tag[cursor + 9] == 0)
+
+            if isBPMFrame && frameFlagsClear {
                 let newPayload = updatedID3TextPayload(payload, value: targetBPM)
                 appendID3Frame(
                     id: frameID,

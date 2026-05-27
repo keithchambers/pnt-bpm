@@ -405,6 +405,124 @@ import Testing
     #expect(riffInfoValue(id: "IBPM", in: copiedList) == "127")
 }
 
+@Test func doesNotDuplicateRepeatedMetadataChunksFromSource() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.wav")
+    let target = directory.appendingPathComponent("target.wav")
+    let firstInfo = makeRIFFInfoList([("INAM", "First")])
+    let secondInfo = makeRIFFInfoList([("INAM", "Second")])
+
+    try makeWAV(metadataChunks: [
+        ("LIST", firstInfo),
+        ("LIST", secondInfo)
+    ]).write(to: source)
+    try makeWAV().write(to: target)
+
+    let result = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(125)
+    )
+
+    let copiedListCount = result.copiedChunks.filter { $0 == "LIST" }.count
+    #expect(copiedListCount == 2)
+    #expect(countRIFFChunks(id: "LIST", in: try Data(contentsOf: target)) == 2)
+}
+
+@Test func leavesUnsynchronisedID3TagsUntouched() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.aiff")
+    let target = directory.appendingPathComponent("target.wav")
+    var id3Tag = makeID3v23Tag(frames: [
+        makeID3v23TextFrame(id: "TBPM", value: "99")
+    ])
+    id3Tag[5] |= 0x80 // mark tag-level unsynchronisation
+
+    try makeAIFFWithID3Tag(id3Tag).write(to: source)
+    try makeWAV().write(to: target)
+
+    _ = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(128)
+    )
+
+    guard let copiedTag = riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied ID3 chunk")
+        return
+    }
+
+    // The tag should round-trip unchanged because we don't risk rewriting it
+    // when unsynchronisation is in play.
+    #expect(copiedTag == id3Tag)
+    #expect(id3v23TextFrameValue(id: "TBPM", in: copiedTag) == "99")
+}
+
+@Test func leavesTBPMFrameAloneWhenFrameFlagsAreSet() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.aiff")
+    let target = directory.appendingPathComponent("target.wav")
+
+    var tbpmFrame = makeID3v23TextFrame(id: "TBPM", value: "99")
+    tbpmFrame[9] = 0x80 // simulate a frame-level "compression" flag
+    let id3Tag = makeID3v23Tag(frames: [
+        makeID3v23TextFrame(id: "TIT2", value: "Source Track"),
+        tbpmFrame
+    ])
+
+    try makeAIFFWithID3Tag(id3Tag).write(to: source)
+    try makeWAV().write(to: target)
+
+    _ = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(128)
+    )
+
+    guard let copiedTag = riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied ID3 chunk")
+        return
+    }
+
+    // Other frames still come through, but the flagged TBPM stays exactly as
+    // it was rather than being silently invalidated by a plain-text rewrite.
+    #expect(id3v23TextFrameValue(id: "TIT2", in: copiedTag) == "Source Track")
+    #expect(id3v23FramePayload(id: "TBPM", in: copiedTag) == Data([0x00] + Array("99".utf8)))
+}
+
+private func countRIFFChunks(id: String, in data: Data) -> Int {
+    guard data.count >= 12,
+          String(bytes: data[0..<4], encoding: .ascii) == "RIFF",
+          String(bytes: data[8..<12], encoding: .ascii) == "WAVE" else {
+        return 0
+    }
+
+    var offset = 12
+    var count = 0
+    while offset + 8 <= data.count {
+        let chunkID = String(bytes: data[offset..<(offset + 4)], encoding: .ascii)
+        let chunkSize = Int(data.uint32LE(at: offset + 4))
+        let payloadStart = offset + 8
+        let payloadEnd = payloadStart + chunkSize
+        guard payloadEnd <= data.count else { return count }
+        if chunkID == id { count += 1 }
+        offset = payloadEnd + (chunkSize % 2)
+    }
+    return count
+}
+
 private func makeAIFFWithID3TBPM(_ bpm: String) -> Data {
     let id3Tag = makeID3v23Tag(frames: [
         makeID3v23TextFrame(id: "TBPM", value: bpm)
