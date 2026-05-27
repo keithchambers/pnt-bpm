@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "pnt-bpm is macOS-only (Serato Pitch n' Time LE is a macOS Audio Unit)." >&2
+  exit 1
+fi
+
 install_dir="${PNT_BPM_INSTALL_DIR:-$HOME/.local/bin}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

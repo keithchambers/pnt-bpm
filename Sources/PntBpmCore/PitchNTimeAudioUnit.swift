@@ -69,6 +69,7 @@ public enum PitchNTimeAudioUnit {
             throw PntBpmError.missingAudioUnitParameter("Gain")
         }
 
+        // Pitch n Time exposes pitch as a percentage; 100 = no pitch change.
         pitchParameter.value = 100.0
         timeParameter.value = Float(time)
         gainParameter.value = gain

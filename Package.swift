@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "SeratoPitchNTimeCLI",
+    name: "pnt-bpm",
     platforms: [
         .macOS(.v13)
     ],

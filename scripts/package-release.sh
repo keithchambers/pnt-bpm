@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-version="$(sed -n 's/.*pntBpmVersion = "\(.*\)".*/\1/p' Sources/PntBpmCore/CLI.swift)"
+version="$(sed -n 's/^public let pntBpmVersion = "\(.*\)"$/\1/p' Sources/PntBpmCore/CLI.swift)"
 if [[ -z "$version" ]]; then
   echo "Could not determine pnt-bpm version." >&2
   exit 1

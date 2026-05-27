@@ -106,19 +106,30 @@ public final class PitchNTimeRenderer {
         var renderedFrames: AVAudioFramePosition = 0
         progress?(RenderProgress(renderedFrames: renderedFrames, totalFrames: targetFrames))
 
-        while renderedFrames < targetFrames {
+        // Stop after this many consecutive zero-progress polls — the source has
+        // run dry and additional offline pulls would spin forever.
+        let maxIdlePolls = 8
+        var idlePolls = 0
+
+        renderLoop: while renderedFrames < targetFrames {
             let remaining = targetFrames - renderedFrames
             let frameCount = min(AVAudioFrameCount(remaining), engine.manualRenderingMaximumFrameCount)
             let status = try engine.renderOffline(frameCount, to: renderBuffer)
 
             switch status {
             case .success:
+                if renderBuffer.frameLength == 0 {
+                    idlePolls += 1
+                    if idlePolls >= maxIdlePolls { break renderLoop }
+                    continue
+                }
+                idlePolls = 0
                 try outputFile.write(from: renderBuffer)
                 renderedFrames += AVAudioFramePosition(renderBuffer.frameLength)
                 progress?(RenderProgress(renderedFrames: renderedFrames, totalFrames: targetFrames))
-            case .insufficientDataFromInputNode:
-                continue
-            case .cannotDoInCurrentContext:
+            case .insufficientDataFromInputNode, .cannotDoInCurrentContext:
+                idlePolls += 1
+                if idlePolls >= maxIdlePolls { break renderLoop }
                 continue
             case .error:
                 throw PntBpmError.renderFailed("AVAudioEngine manual render returned an error")

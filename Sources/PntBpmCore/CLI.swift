@@ -124,8 +124,11 @@ public struct CLIParser {
         guard let inputPath else {
             throw PntBpmError.missingInput
         }
-        guard let sourceRaw, let sourceValue = Double(sourceRaw) else {
-            throw sourceRaw == nil ? PntBpmError.missingSource : PntBpmError.invalidBPM(sourceRaw!)
+        guard let sourceRaw else {
+            throw PntBpmError.missingSource
+        }
+        guard let sourceValue = Double(sourceRaw) else {
+            throw PntBpmError.invalidBPM(sourceRaw)
         }
 
         let source = try BPM(sourceValue)

@@ -18,9 +18,14 @@ public struct BPM: Equatable, Comparable, CustomStringConvertible {
         if value.rounded() == value {
             return String(Int(value))
         }
-        return String(format: "%.3f", value)
-            .replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
+        var formatted = String(format: "%.3f", value)
+        while formatted.hasSuffix("0") {
+            formatted.removeLast()
+        }
+        if formatted.hasSuffix(".") {
+            formatted.removeLast()
+        }
+        return formatted
     }
 }
 
