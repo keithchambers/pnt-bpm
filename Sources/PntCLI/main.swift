@@ -37,9 +37,13 @@ private func displayPath(for url: URL?) -> String {
     return path
 }
 
-private func sourceBPMDisplay(_ source: BPM?) -> String {
-    if let source { return source.description }
-    return "auto-detected"
+private func sourceBPMDisplay(explicit: BPM?, resolved: [(URL, BPM)]) -> String {
+    if let explicit { return explicit.description }
+    let detected = resolved.map { $0.1 }
+    if Set(detected.map(\.value)).count == 1, let first = detected.first {
+        return first.description
+    }
+    return detected.map(\.description).joined(separator: " ")
 }
 
 private func runRender(_ options: RenderOptions) throws {
@@ -57,7 +61,7 @@ private func runRender(_ options: RenderOptions) throws {
     reporter.printPlan(
         Reporter.Plan(
             tracks: options.inputs.count,
-            sourceBPMDisplay: sourceBPMDisplay(options.source),
+            sourceBPMDisplay: sourceBPMDisplay(explicit: options.source, resolved: resolvedInputs),
             targets: options.targets,
             outDirDisplay: displayPath(for: options.outDir)
         )
