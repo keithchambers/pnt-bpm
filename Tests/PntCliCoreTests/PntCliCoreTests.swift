@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 import Testing
-@testable import PntBpmCore
+@testable import PntCliCore
 
 @Test func parsesCommaSeparatedTargets() throws {
     let targets = try parseBPMList(["125,122,120"])
@@ -10,7 +10,7 @@ import Testing
 
 @Test func parsesRepeatedTargets() throws {
     let command = try CLIParser.parse([
-        "pnt-bpm",
+        "pnt-cli",
         "song.wav",
         "--source",
         "128",
@@ -67,15 +67,15 @@ import Testing
 }
 
 @Test func rejectsMissingTargets() {
-    #expect(throws: PntBpmError.missingTargets) {
-        _ = try CLIParser.parse(["pnt-bpm", "song.wav", "--source", "120"])
+    #expect(throws: PntCliError.missingTargets) {
+        _ = try CLIParser.parse(["pnt-cli", "song.wav", "--source", "120"])
     }
 }
 
 @Test func rejectsMP3Inputs() {
-    #expect(throws: PntBpmError.unsupportedInputFormat(URL(fileURLWithPath: "/tmp/song.mp3"))) {
+    #expect(throws: PntCliError.unsupportedInputFormat(URL(fileURLWithPath: "/tmp/song.mp3"))) {
         _ = try CLIParser.parse([
-            "pnt-bpm",
+            "pnt-cli",
             "/tmp/song.mp3",
             "--source",
             "120",
@@ -84,9 +84,9 @@ import Testing
         ])
     }
 
-    #expect(throws: PntBpmError.unsupportedInputFormat(URL(fileURLWithPath: "/tmp/song.MP3"))) {
+    #expect(throws: PntCliError.unsupportedInputFormat(URL(fileURLWithPath: "/tmp/song.MP3"))) {
         _ = try CLIParser.parse([
-            "pnt-bpm",
+            "pnt-cli",
             "--input",
             "/tmp/song.MP3",
             "--source",
@@ -99,7 +99,7 @@ import Testing
 
 @Test func parsesMultiplePositionalInputs() throws {
     let command = try CLIParser.parse([
-        "pnt-bpm",
+        "pnt-cli",
         "a.wav",
         "b.aiff",
         "c.wav",
@@ -120,7 +120,7 @@ import Testing
 
 @Test func parsesRepeatedInputFlag() throws {
     let command = try CLIParser.parse([
-        "pnt-bpm",
+        "pnt-cli",
         "-i",
         "a.wav",
         "--input",
@@ -145,9 +145,9 @@ import Testing
 }
 
 @Test func rejectsJobsOverride() {
-    #expect(throws: PntBpmError.invalidOption("--jobs")) {
+    #expect(throws: PntCliError.invalidOption("--jobs")) {
         _ = try CLIParser.parse([
-            "pnt-bpm",
+            "pnt-cli",
             "song.wav",
             "--source",
             "128",
@@ -160,9 +160,9 @@ import Testing
 }
 
 @Test func rejectsCopyMetadataFlagBecauseMetadataCopyIsAutomatic() {
-    #expect(throws: PntBpmError.invalidOption("--copy-metadata")) {
+    #expect(throws: PntCliError.invalidOption("--copy-metadata")) {
         _ = try CLIParser.parse([
-            "pnt-bpm",
+            "pnt-cli",
             "song.wav",
             "--source",
             "128",
@@ -289,7 +289,7 @@ import Testing
 }
 
 @Test func rejectsCollidingOutputsAcrossInputs() {
-    #expect(throws: PntBpmError.outputCollision(URL(fileURLWithPath: "/renders/song_125bpm.wav"))) {
+    #expect(throws: PntCliError.outputCollision(URL(fileURLWithPath: "/renders/song_125bpm.wav"))) {
         _ = try OutputPlanner.plans(
             inputs: [
                 URL(fileURLWithPath: "/a/song.wav"),
@@ -305,7 +305,7 @@ import Testing
 }
 
 @Test func rejectsEmptyInputs() {
-    #expect(throws: PntBpmError.missingInput) {
+    #expect(throws: PntCliError.missingInput) {
         _ = try OutputPlanner.plans(
             inputs: [],
             source: try BPM(120),
@@ -318,7 +318,7 @@ import Testing
 }
 
 @Test func rejectsUnsupportedFormat() throws {
-    #expect(throws: PntBpmError.unsupportedFormat("mp3")) {
+    #expect(throws: PntCliError.unsupportedFormat("mp3")) {
         _ = try OutputPlanner.plans(
             input: URL(fileURLWithPath: "/tmp/song.wav"),
             source: try BPM(120),
@@ -332,7 +332,7 @@ import Testing
 
 @Test func sourceIsOptionalWhenAutoDetectIntended() throws {
     let command = try CLIParser.parse([
-        "pnt-bpm",
+        "pnt-cli",
         "song.aiff",
         "--target",
         "125"
@@ -354,7 +354,7 @@ import Testing
 
 @Test func detectsAIFFID3TBPMBeforeFilenameFallback() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -393,7 +393,7 @@ import Testing
 
 @Test func copiesID3MetadataAndArtworkToRenderedWAVAndUpdatesBPM() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -439,7 +439,7 @@ import Testing
 
 @Test func copiesRIFFInfoMetadataAndUpdatesBPM() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -474,7 +474,7 @@ import Testing
 
 @Test func doesNotDuplicateRepeatedMetadataChunksFromSource() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -502,7 +502,7 @@ import Testing
 
 @Test func leavesUnsynchronisedID3TagsUntouched() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -535,7 +535,7 @@ import Testing
 
 @Test func leavesTBPMFrameAloneWhenFrameFlagsAreSet() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -571,7 +571,7 @@ import Testing
 
 @Test func writesUppercaseID3ChunkToAIFFTarget() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -598,7 +598,7 @@ import Testing
 
 @Test func skipsAIFFOnlyChunksWhenWritingToWAVTarget() throws {
     let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("pnt-cli-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
 

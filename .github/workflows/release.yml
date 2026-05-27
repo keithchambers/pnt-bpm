@@ -33,7 +33,7 @@ jobs:
           : "${DEVELOPER_ID_INSTALLER_P12_BASE64:?Missing DEVELOPER_ID_INSTALLER_P12_BASE64 secret}"
           : "${DEVELOPER_ID_INSTALLER_P12_PASSWORD:?Missing DEVELOPER_ID_INSTALLER_P12_PASSWORD secret}"
 
-          signing_keychain="$RUNNER_TEMP/pnt-bpm-signing.keychain-db"
+          signing_keychain="$RUNNER_TEMP/pnt-cli-signing.keychain-db"
           signing_keychain_password="$(uuidgen)"
           app_certificate="$RUNNER_TEMP/developer-id-application.p12"
           installer_certificate="$RUNNER_TEMP/developer-id-installer.p12"
@@ -56,18 +56,18 @@ jobs:
             exit 1
           fi
 
-          echo "PNT_BPM_APP_SIGN_IDENTITY=$app_identity" >> "$GITHUB_ENV"
-          echo "PNT_BPM_PKG_SIGN_IDENTITY=$pkg_identity" >> "$GITHUB_ENV"
-          echo "PNT_BPM_SIGNING_KEYCHAIN=$signing_keychain" >> "$GITHUB_ENV"
+          echo "PNT_CLI_APP_SIGN_IDENTITY=$app_identity" >> "$GITHUB_ENV"
+          echo "PNT_CLI_PKG_SIGN_IDENTITY=$pkg_identity" >> "$GITHUB_ENV"
+          echo "PNT_CLI_SIGNING_KEYCHAIN=$signing_keychain" >> "$GITHUB_ENV"
 
       - name: Validate tag matches CLI version
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
-          cli_version="$(sed -n 's/^public let pntBpmVersion = "\(.*\)"$/\1/p' Sources/PntBpmCore/CLI.swift)"
+          cli_version="$(sed -n 's/^public let pntCliVersion = "\(.*\)"$/\1/p' Sources/PntCliCore/CLI.swift)"
           test "$tag_version" = "$cli_version"
 
       - name: Build release package
-        run: PNT_BPM_REQUIRE_SIGNING=1 scripts/package-release.sh
+        run: PNT_CLI_REQUIRE_SIGNING=1 scripts/package-release.sh
 
       - name: Notarize release package
         env:
@@ -89,26 +89,26 @@ jobs:
             printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 -D > "$notary_key"
             chmod 600 "$notary_key"
 
-            PNT_BPM_NOTARY_KEY_PATH="$notary_key" \
-            PNT_BPM_NOTARY_KEY_ID="$APPLE_API_KEY_ID" \
-            PNT_BPM_NOTARY_ISSUER_ID="$APPLE_API_ISSUER_ID" \
+            PNT_CLI_NOTARY_KEY_PATH="$notary_key" \
+            PNT_CLI_NOTARY_KEY_ID="$APPLE_API_KEY_ID" \
+            PNT_CLI_NOTARY_ISSUER_ID="$APPLE_API_ISSUER_ID" \
               scripts/notarize-package.sh
           else
             : "${APPLE_ID:?Missing APPLE_ID secret}"
             : "${APPLE_APP_SPECIFIC_PASSWORD:?Missing APPLE_APP_SPECIFIC_PASSWORD secret}"
             : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID secret}"
 
-            PNT_BPM_NOTARY_APPLE_ID="$APPLE_ID" \
-            PNT_BPM_NOTARY_PASSWORD="$APPLE_APP_SPECIFIC_PASSWORD" \
-            PNT_BPM_NOTARY_TEAM_ID="$APPLE_TEAM_ID" \
+            PNT_CLI_NOTARY_APPLE_ID="$APPLE_ID" \
+            PNT_CLI_NOTARY_PASSWORD="$APPLE_APP_SPECIFIC_PASSWORD" \
+            PNT_CLI_NOTARY_TEAM_ID="$APPLE_TEAM_ID" \
               scripts/notarize-package.sh
           fi
 
       - name: Verify release package
         run: |
-          PNT_BPM_REQUIRE_SIGNED_BINARY=1 \
-          PNT_BPM_REQUIRE_SIGNED_PKG=1 \
-          PNT_BPM_REQUIRE_NOTARIZED_PKG=1 \
+          PNT_CLI_REQUIRE_SIGNED_BINARY=1 \
+          PNT_CLI_REQUIRE_SIGNED_PKG=1 \
+          PNT_CLI_REQUIRE_NOTARIZED_PKG=1 \
             scripts/verify-package.sh
 
       - name: Create GitHub release
@@ -116,14 +116,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          package="dist/pnt-bpm-${version}.pkg"
+          package="dist/pnt-cli-${version}.pkg"
           gh release create "$GITHUB_REF_NAME" "$package" \
-            --title "pnt-bpm $version" \
-            --notes "Download pnt-bpm-${version}.pkg and open it. The package is signed with Developer ID and notarized by Apple."
+            --title "pnt-cli $version" \
+            --notes "Download pnt-cli-${version}.pkg and open it. The package is signed with Developer ID and notarized by Apple."
 
       - name: Delete signing keychain
         if: always()
         run: |
-          if [[ -n "${PNT_BPM_SIGNING_KEYCHAIN:-}" && -f "$PNT_BPM_SIGNING_KEYCHAIN" ]]; then
-            security delete-keychain "$PNT_BPM_SIGNING_KEYCHAIN"
+          if [[ -n "${PNT_CLI_SIGNING_KEYCHAIN:-}" && -f "$PNT_CLI_SIGNING_KEYCHAIN" ]]; then
+            security delete-keychain "$PNT_CLI_SIGNING_KEYCHAIN"
           fi

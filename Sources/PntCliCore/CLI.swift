@@ -105,7 +105,7 @@ public struct CLIParser {
 
         func popValue(after option: String) throws -> String {
             guard !args.isEmpty else {
-                throw PntBpmError.usage("\(option) requires a value")
+                throw PntCliError.usage("\(option) requires a value")
             }
             return args.removeFirst()
         }
@@ -140,31 +140,31 @@ public struct CLIParser {
             case "--gain":
                 let raw = try popValue(after: arg)
                 guard let parsed = Float(raw), parsed.isFinite, parsed >= 0, parsed <= 2 else {
-                    throw PntBpmError.usage("--gain must be a number from 0 to 2")
+                    throw PntCliError.usage("--gain must be a number from 0 to 2")
                 }
                 gain = parsed
             case "--tail-ms":
                 let raw = try popValue(after: arg)
                 guard let parsed = Double(raw), parsed.isFinite, parsed >= 0 else {
-                    throw PntBpmError.usage("--tail-ms must be a non-negative number")
+                    throw PntCliError.usage("--tail-ms must be a non-negative number")
                 }
                 tailMilliseconds = parsed
             default:
                 if arg.hasPrefix("-") {
-                    throw PntBpmError.invalidOption(arg)
+                    throw PntCliError.invalidOption(arg)
                 }
                 inputPaths.append(arg)
             }
         }
 
         guard !inputPaths.isEmpty else {
-            throw PntBpmError.missingInput
+            throw PntCliError.missingInput
         }
 
         let source: BPM?
         if let sourceRaw {
             guard let sourceValue = Double(sourceRaw) else {
-                throw PntBpmError.invalidBPM(sourceRaw)
+                throw PntCliError.invalidBPM(sourceRaw)
             }
             source = try BPM(sourceValue)
         } else {
@@ -195,26 +195,26 @@ public struct CLIParser {
 
     private static func validateInputFormats(_ inputs: [URL]) throws {
         for input in inputs where input.pathExtension.lowercased() == "mp3" {
-            throw PntBpmError.unsupportedInputFormat(input)
+            throw PntCliError.unsupportedInputFormat(input)
         }
     }
 }
 
-public let pntBpmVersion = "1.0.1"
+public let pntCliVersion = "1.0.0"
 
 public let helpText = """
-pnt-bpm \(pntBpmVersion)
+pnt-cli \(pntCliVersion)
 Batch tempo-change songs with Serato Pitch n Time LE.
 
 USAGE:
-  pnt-bpm <INPUT> [INPUT...] [--source <BPM>] --target <BPM[,BPM...]> [OPTIONS]
+  pnt-cli <INPUT> [INPUT...] [--source <BPM>] --target <BPM[,BPM...]> [OPTIONS]
 
 EXAMPLES:
-  pnt-bpm song.wav --source 128 --target 125,122,120
-  pnt-bpm song.wav --target 125,122,120                 # auto-detect source BPM
-  pnt-bpm a.wav b.wav c.aiff --source 128 --target 125,122
-  pnt-bpm -i a.wav -i b.wav --source 128 --target 125,122
-  pnt-bpm song.aiff --source 120 --target 125,128 --out-dir renders
+  pnt-cli song.wav --source 128 --target 125,122,120
+  pnt-cli song.wav --target 125,122,120                 # auto-detect source BPM
+  pnt-cli a.wav b.wav c.aiff --source 128 --target 125,122
+  pnt-cli -i a.wav -i b.wav --source 128 --target 125,122
+  pnt-cli song.aiff --source 120 --target 125,128 --out-dir renders
 
 ARGUMENTS:
   <INPUT> [INPUT...]
@@ -234,11 +234,11 @@ INPUTS:
 
 SOURCE:
   -s, --source <BPM>
-      Source tempo applied to every input file. If omitted, pnt-bpm tries
+      Source tempo applied to every input file. If omitted, pnt-cli tries
       to detect it per input from Beatport-purchased tracks only — either
       the ID3 TBPM frame embedded in the file's metadata, or the BPM slot
       in Beatport's filename convention ("..._(Mix)__<BPM>__<Key>.aiff").
-      If neither is present for any input, pnt-bpm errors out rather than
+      If neither is present for any input, pnt-cli errors out rather than
       guessing.
 
 OUTPUT:

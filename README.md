@@ -1,4 +1,4 @@
-# pnt-bpm
+# pnt-cli
 
 ## Overview
 
@@ -6,17 +6,17 @@ Serato Pitch n' Time provides the industry's leading pitch-shifting and time-str
 
 Serato only supports Pitch n' Time running in Logic Pro and Pro Tools DAWs. That is powerful for studio workflows, but it creates friction for repeatable batch work: launching a DAW, creating or opening a session, loading the plugin, setting tempo changes, bouncing files, and repeating the process for every target BPM.
 
-`pnt-bpm` eliminates that DAW dependency for macOS users who already have Serato Pitch n' Time LE installed locally. It hosts the installed Pitch n' Time Audio Unit directly from the command line, enabling Pitch n' Time users on macOS to convert the BPM of a track to a different BPM without changing pitch.
+`pnt-cli` eliminates that DAW dependency for macOS users who already have Serato Pitch n' Time LE installed locally. It hosts the installed Pitch n' Time Audio Unit directly from the command line, enabling Pitch n' Time users on macOS to convert the BPM of a track to a different BPM without changing pitch.
 
 Example:
 
 ```sh
-pnt-bpm song.aiff --source 120 --target 125,128
+pnt-cli song.aiff --source 120 --target 125,128
 ```
 
 This creates new rendered audio files at 125 BPM and 128 BPM using Serato Pitch n' Time for the tempo conversion.
 
-`pnt-bpm` is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Serato. It does not include Serato Pitch n' Time; users must install and license Serato Pitch n' Time LE separately.
+`pnt-cli` is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Serato. It does not include Serato Pitch n' Time; users must install and license Serato Pitch n' Time LE separately.
 
 ## Installation
 
@@ -27,14 +27,14 @@ Requirements:
 
 Download the macOS release package:
 
-[pnt-bpm-1.0.1.pkg](https://github.com/keithchambers/pnt-bpm/releases/download/v1.0.1/pnt-bpm-1.0.1.pkg)
+[pnt-cli-1.0.0.pkg](https://github.com/keithchambers/pnt-cli/releases/download/v1.0.0/pnt-cli-1.0.0.pkg)
 
-Open `pnt-bpm-1.0.1.pkg` and follow the installer prompts.
+Open `pnt-cli-1.0.0.pkg` and follow the installer prompts.
 
 Verify that the CLI can load Serato Pitch n' Time:
 
 ```sh
-pnt-bpm --doctor --verbose
+pnt-cli --doctor --verbose
 ```
 
 ## Usage
@@ -42,12 +42,12 @@ pnt-bpm --doctor --verbose
 Render one target BPM:
 
 ```sh
-pnt-bpm song.wav --source 120 --target 125
+pnt-cli song.wav --source 120 --target 125
 ```
 
 ### Auto-detecting the source BPM (Beatport only)
 
-If you omit `--source`, `pnt-bpm` will try to read the BPM from a
+If you omit `--source`, `pnt-cli` will try to read the BPM from a
 Beatport-purchased track in one of two ways:
 
 1. **ID3 `TBPM` frame** embedded in the file's metadata (Beatport
@@ -58,20 +58,20 @@ Beatport-purchased track in one of two ways:
 
 ```sh
 # Either the ID3 TBPM frame or the __125__ slot in the filename works:
-pnt-bpm "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
+pnt-cli "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
 ```
 
 Values outside 50–220 BPM are rejected — this filters out Beatport's
 older 7–8-digit track-IDs that occasionally appear in the same slot
 (`__17628366__`). Nothing else is attempted: there is no parent-directory
 walk, no generic metadata-key search, and no audio-content analysis. If
-neither source is present, `pnt-bpm` errors out and you should pass
+neither source is present, `pnt-cli` errors out and you should pass
 `--source <BPM>` explicitly.
 
 Render multiple target BPMs:
 
 ```sh
-pnt-bpm song.wav --source 120 --target 125,128
+pnt-cli song.wav --source 120 --target 125,128
 ```
 
 Render multiple source files at the same target BPMs in a single run. Every
@@ -79,10 +79,10 @@ input is warped to every target, so the command below produces six files
 (three inputs × two targets):
 
 ```sh
-pnt-bpm a.wav b.wav c.aiff --source 120 --target 125,128
+pnt-cli a.wav b.wav c.aiff --source 120 --target 125,128
 ```
 
-Those planned renders run concurrently by default — `pnt-bpm` fans out across
+Those planned renders run concurrently by default — `pnt-cli` fans out across
 the active CPU count reported by macOS, and each job loads its own Pitch n'
 Time Audio Unit instance.
 
@@ -91,7 +91,7 @@ independently for each file — so a batch of Beatport tracks at different
 tempos can be rendered to a shared target in one invocation:
 
 ```sh
-pnt-bpm "Artist_A_Track_A_(Original_Mix)__125__G_Minor.aiff" \
+pnt-cli "Artist_A_Track_A_(Original_Mix)__125__G_Minor.aiff" \
   "Artist_B_Track_B_(Extended_Mix)__128__A_Minor.aiff" \
   --target 124
 ```
@@ -100,31 +100,31 @@ Inputs can also be passed via repeated `-i`/`--input` flags, which is handy
 when paths contain spaces or come from another command:
 
 ```sh
-pnt-bpm -i "track one.wav" -i "track two.wav" --source 120 --target 125,128
+pnt-cli -i "track one.wav" -i "track two.wav" --source 120 --target 125,128
 ```
 
 `--output` is accepted as an alias for `--target`:
 
 ```sh
-pnt-bpm song.wav --source 120 --output 125,128
+pnt-cli song.wav --source 120 --output 125,128
 ```
 
 Write files to a specific directory:
 
 ```sh
-pnt-bpm song.aiff --source 120 --target 125,128 --out-dir renders
+pnt-cli song.aiff --source 120 --target 125,128 --out-dir renders
 ```
 
 Preview what will be rendered without writing files:
 
 ```sh
-pnt-bpm song.aiff --source 120 --target 125,128 --dry-run
+pnt-cli song.aiff --source 120 --target 125,128 --dry-run
 ```
 
 Overwrite existing output files:
 
 ```sh
-pnt-bpm song.aiff --source 120 --target 125,128 --overwrite
+pnt-cli song.aiff --source 120 --target 125,128 --overwrite
 ```
 
 Rendered WAVs automatically copy source track metadata and artwork when
@@ -134,7 +134,7 @@ is updated to match each target BPM.
 Show detailed render ratios and progress:
 
 ```sh
-pnt-bpm song.aiff --source 120 --target 125,128 --verbose
+pnt-cli song.aiff --source 120 --target 125,128 --verbose
 ```
 
 Default output names use this pattern:
@@ -153,10 +153,10 @@ song_128bpm.wav
 Use a custom output naming pattern:
 
 ```sh
-pnt-bpm song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm}.{ext}"
+pnt-cli song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm}.{ext}"
 ```
 
-When rendering multiple inputs into a shared `--out-dir`, `pnt-bpm` refuses
+When rendering multiple inputs into a shared `--out-dir`, `pnt-cli` refuses
 to start if two planned renders would write to the same output path (for
 example, two files both named `song` from different directories). This collision
 check runs before concurrent jobs start. Rename one of the inputs or render each

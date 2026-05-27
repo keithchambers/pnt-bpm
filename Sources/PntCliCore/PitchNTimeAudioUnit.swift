@@ -24,7 +24,7 @@ public enum PitchNTimeAudioUnit {
 
         var mutableDescription = description
         guard AudioComponentFindNext(nil, &mutableDescription) != nil else {
-            throw PntBpmError.audioUnitNotFound
+            throw PntCliError.audioUnitNotFound
         }
 
         let semaphore = DispatchSemaphore(value: 0)
@@ -38,7 +38,7 @@ public enum PitchNTimeAudioUnit {
         semaphore.wait()
 
         guard let unit = result.unit else {
-            throw PntBpmError.audioUnitInstantiateFailed(result.error?.localizedDescription ?? "unknown error")
+            throw PntCliError.audioUnitInstantiateFailed(result.error?.localizedDescription ?? "unknown error")
         }
 
         try verifyRequiredParameters(unit)
@@ -60,13 +60,13 @@ public enum PitchNTimeAudioUnit {
 
     public static func configure(_ unit: AVAudioUnit, time: Double, gain: Float) throws {
         guard let pitchParameter = unit.auAudioUnit.parameterTree?.parameter(withAddress: pitchAddress) else {
-            throw PntBpmError.missingAudioUnitParameter("Pitch")
+            throw PntCliError.missingAudioUnitParameter("Pitch")
         }
         guard let timeParameter = unit.auAudioUnit.parameterTree?.parameter(withAddress: timeAddress) else {
-            throw PntBpmError.missingAudioUnitParameter("Time")
+            throw PntCliError.missingAudioUnitParameter("Time")
         }
         guard let gainParameter = unit.auAudioUnit.parameterTree?.parameter(withAddress: gainAddress) else {
-            throw PntBpmError.missingAudioUnitParameter("Gain")
+            throw PntCliError.missingAudioUnitParameter("Gain")
         }
 
         // Pitch n Time exposes pitch as a percentage; 100 = no pitch change.
@@ -78,13 +78,13 @@ public enum PitchNTimeAudioUnit {
     private static func verifyRequiredParameters(_ unit: AVAudioUnit) throws {
         let tree = unit.auAudioUnit.parameterTree
         if tree?.parameter(withAddress: pitchAddress) == nil {
-            throw PntBpmError.missingAudioUnitParameter("Pitch")
+            throw PntCliError.missingAudioUnitParameter("Pitch")
         }
         if tree?.parameter(withAddress: timeAddress) == nil {
-            throw PntBpmError.missingAudioUnitParameter("Time")
+            throw PntCliError.missingAudioUnitParameter("Time")
         }
         if tree?.parameter(withAddress: gainAddress) == nil {
-            throw PntBpmError.missingAudioUnitParameter("Gain")
+            throw PntCliError.missingAudioUnitParameter("Gain")
         }
     }
 

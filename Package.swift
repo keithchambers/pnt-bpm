@@ -3,29 +3,29 @@
 import PackageDescription
 
 let package = Package(
-    name: "pnt-bpm",
+    name: "pnt-cli",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "pnt-bpm", targets: ["PntBpmCLI"]),
-        .library(name: "PntBpmCore", targets: ["PntBpmCore"])
+        .executable(name: "pnt-cli", targets: ["PntCLI"]),
+        .library(name: "PntCliCore", targets: ["PntCliCore"])
     ],
     targets: [
         .target(
-            name: "PntBpmCore",
+            name: "PntCliCore",
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
             ]
         ),
         .executableTarget(
-            name: "PntBpmCLI",
-            dependencies: ["PntBpmCore"]
+            name: "PntCLI",
+            dependencies: ["PntCliCore"]
         ),
         .testTarget(
-            name: "PntBpmCoreTests",
-            dependencies: ["PntBpmCore"]
+            name: "PntCliCoreTests",
+            dependencies: ["PntCliCore"]
         )
     ]
 )
