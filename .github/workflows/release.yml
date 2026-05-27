@@ -74,21 +74,35 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
 
-          : "${APPLE_API_KEY_ID:?Missing APPLE_API_KEY_ID secret}"
-          : "${APPLE_API_ISSUER_ID:?Missing APPLE_API_ISSUER_ID secret}"
-          : "${APPLE_API_KEY_P8_BASE64:?Missing APPLE_API_KEY_P8_BASE64 secret}"
+          if [[ -n "$APPLE_API_KEY_ID" || -n "$APPLE_API_ISSUER_ID" || -n "$APPLE_API_KEY_P8_BASE64" ]]; then
+            : "${APPLE_API_KEY_ID:?Missing APPLE_API_KEY_ID secret}"
+            : "${APPLE_API_ISSUER_ID:?Missing APPLE_API_ISSUER_ID secret}"
+            : "${APPLE_API_KEY_P8_BASE64:?Missing APPLE_API_KEY_P8_BASE64 secret}"
 
-          notary_key="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
-          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 -D > "$notary_key"
-          chmod 600 "$notary_key"
+            notary_key="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 -D > "$notary_key"
+            chmod 600 "$notary_key"
 
-          PNT_BPM_NOTARY_KEY_PATH="$notary_key" \
-          PNT_BPM_NOTARY_KEY_ID="$APPLE_API_KEY_ID" \
-          PNT_BPM_NOTARY_ISSUER_ID="$APPLE_API_ISSUER_ID" \
-            scripts/notarize-package.sh
+            PNT_BPM_NOTARY_KEY_PATH="$notary_key" \
+            PNT_BPM_NOTARY_KEY_ID="$APPLE_API_KEY_ID" \
+            PNT_BPM_NOTARY_ISSUER_ID="$APPLE_API_ISSUER_ID" \
+              scripts/notarize-package.sh
+          else
+            : "${APPLE_ID:?Missing APPLE_ID secret}"
+            : "${APPLE_APP_SPECIFIC_PASSWORD:?Missing APPLE_APP_SPECIFIC_PASSWORD secret}"
+            : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID secret}"
+
+            PNT_BPM_NOTARY_APPLE_ID="$APPLE_ID" \
+            PNT_BPM_NOTARY_PASSWORD="$APPLE_APP_SPECIFIC_PASSWORD" \
+            PNT_BPM_NOTARY_TEAM_ID="$APPLE_TEAM_ID" \
+              scripts/notarize-package.sh
+          fi
 
       - name: Verify release package
         run: |

@@ -32,6 +32,15 @@ after creating the Developer ID certificates in the Apple Developer account.
 Create the `.p8` key in App Store Connect as an API key that can use the Apple
 notary service.
 
+Instead of the App Store Connect API key, the workflow can also notarize with an
+Apple ID and app-specific password:
+
+```sh
+gh secret set APPLE_ID --repo keithchambers/pnt-bpm --body "djkeithchambers@gmail.com"
+gh secret set APPLE_TEAM_ID --repo keithchambers/pnt-bpm --body "6L4C5M8K2S"
+gh secret set APPLE_APP_SPECIFIC_PASSWORD --repo keithchambers/pnt-bpm
+```
+
 Do not commit `.p12`, `.p8`, passwords, or app-specific passwords to this repo.
 
 The binary is signed with the hardened runtime and the
