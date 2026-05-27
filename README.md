@@ -116,7 +116,9 @@ independently for each file — so a batch of Beatport tracks at different
 tempos can be rendered to a shared target in one invocation:
 
 ```sh
-pnt-bpm track-a-125.aiff track-b-128.aiff --target 124
+pnt-bpm "Artist_A_Track_A_(Original_Mix)__125__G_Minor.aiff" \
+  "Artist_B_Track_B_(Extended_Mix)__128__A_Minor.aiff" \
+  --target 124
 ```
 
 Inputs can also be passed via repeated `-i`/`--input` flags, which is handy

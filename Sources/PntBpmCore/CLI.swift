@@ -50,6 +50,34 @@ public struct RenderOptions: Equatable {
         self.gain = gain
         self.tailMilliseconds = tailMilliseconds
     }
+
+    public init(
+        input: URL,
+        source: BPM?,
+        targets: [BPM],
+        outDir: URL? = nil,
+        format: String = "wav",
+        nameTemplate: String = "{title}_{bpm}bpm.{ext}",
+        overwrite: Bool = false,
+        dryRun: Bool = false,
+        verbose: Bool = false,
+        gain: Float = 1.0,
+        tailMilliseconds: Double = 0
+    ) {
+        self.init(
+            inputs: [input],
+            source: source,
+            targets: targets,
+            outDir: outDir,
+            format: format,
+            nameTemplate: nameTemplate,
+            overwrite: overwrite,
+            dryRun: dryRun,
+            verbose: verbose,
+            gain: gain,
+            tailMilliseconds: tailMilliseconds
+        )
+    }
 }
 
 public struct CLIParser {
@@ -174,7 +202,7 @@ EXAMPLES:
   pnt-bpm song.wav --source 128 --target 125,122,120
   pnt-bpm song.wav --target 125,122,120                 # auto-detect source BPM
   pnt-bpm a.wav b.wav c.aiff --source 128 --target 125,122
-  pnt-bpm -i a.wav -i b.wav --target 125,122            # auto-detect each source
+  pnt-bpm -i a.wav -i b.wav --source 128 --target 125,122
   pnt-bpm song.aiff --source 120 --target 125,128 --out-dir renders
 
 ARGUMENTS:

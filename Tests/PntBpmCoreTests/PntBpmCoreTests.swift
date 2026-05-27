@@ -114,6 +114,17 @@ import Testing
     #expect(options.inputs.map(\.lastPathComponent) == ["a.wav", "b.wav", "c.wav"])
 }
 
+@Test func renderOptionsKeepsSingleInputInitializerCompatibility() throws {
+    let options = RenderOptions(
+        input: URL(fileURLWithPath: "/tmp/song.wav"),
+        source: try BPM(128),
+        targets: [try BPM(125)]
+    )
+
+    #expect(options.input.path == "/tmp/song.wav")
+    #expect(options.inputs.map(\.path) == ["/tmp/song.wav"])
+}
+
 @Test func multiInputPlansFanOutOverInputsAndTargets() throws {
     let plans = try OutputPlanner.plans(
         inputs: [
