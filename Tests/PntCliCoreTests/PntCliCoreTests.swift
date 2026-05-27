@@ -16,7 +16,7 @@ import Testing
         "128",
         "--target",
         "125",
-        "--output",
+        "-t",
         "122,120"
     ])
 
@@ -38,31 +38,18 @@ import Testing
     #expect(abs(ratios.outputDurationRatio - 0.9375) < 0.0000001)
 }
 
-@Test func rendersOutputNameTemplate() throws {
-    let name = OutputPlanner.renderName(
-        template: "{title}_{bpm}bpm.{ext}",
-        title: "song",
-        bpm: "125",
-        ext: "wav"
-    )
-
-    #expect(name == "song_125bpm.wav")
-}
-
-@Test func dryRunPlansDefaultToInputDirectory() throws {
+@Test func outputExtensionMatchesInput() throws {
     let input = URL(fileURLWithPath: "/tmp/song.aiff")
     let plans = try OutputPlanner.plans(
         input: input,
         source: try BPM(120),
         targets: [try BPM(125), try BPM(128)],
-        outDir: nil,
-        format: "wav",
-        nameTemplate: "{title}_{bpm}bpm.{ext}"
+        outDir: nil
     )
 
     #expect(plans.map { $0.outputURL.path } == [
-        "/tmp/song_125bpm.wav",
-        "/tmp/song_128bpm.wav"
+        "/tmp/song_125bpm.aiff",
+        "/tmp/song_128bpm.aiff"
     ])
 }
 
@@ -237,16 +224,14 @@ import Testing
         ],
         source: try BPM(120),
         targets: [try BPM(125), try BPM(128)],
-        outDir: nil,
-        format: "wav",
-        nameTemplate: "{title}_{bpm}bpm.{ext}"
+        outDir: nil
     )
 
     #expect(plans.map { $0.outputURL.path } == [
         "/tmp/a_125bpm.wav",
         "/tmp/a_128bpm.wav",
-        "/tmp/b_125bpm.wav",
-        "/tmp/b_128bpm.wav"
+        "/tmp/b_125bpm.aiff",
+        "/tmp/b_128bpm.aiff"
     ])
 }
 
@@ -257,15 +242,13 @@ import Testing
             (URL(fileURLWithPath: "/tmp/b.aiff"), try BPM(128))
         ],
         targets: [try BPM(125)],
-        outDir: nil,
-        format: "wav",
-        nameTemplate: "{title}_{bpm}bpm.{ext}"
+        outDir: nil
     )
 
     #expect(plans.map(\.source.value) == [120, 128])
     #expect(plans.map { $0.outputURL.path } == [
         "/tmp/a_125bpm.wav",
-        "/tmp/b_125bpm.wav"
+        "/tmp/b_125bpm.aiff"
     ])
 }
 
@@ -277,9 +260,7 @@ import Testing
         ],
         source: try BPM(120),
         targets: [try BPM(125)],
-        outDir: URL(fileURLWithPath: "/renders"),
-        format: "wav",
-        nameTemplate: "{title}_{bpm}bpm.{ext}"
+        outDir: URL(fileURLWithPath: "/renders")
     )
 
     #expect(plans.map { $0.outputURL.path } == [
@@ -293,13 +274,11 @@ import Testing
         _ = try OutputPlanner.plans(
             inputs: [
                 URL(fileURLWithPath: "/a/song.wav"),
-                URL(fileURLWithPath: "/b/song.aiff")
+                URL(fileURLWithPath: "/b/song.wav")
             ],
             source: try BPM(120),
             targets: [try BPM(125)],
-            outDir: URL(fileURLWithPath: "/renders"),
-            format: "wav",
-            nameTemplate: "{title}_{bpm}bpm.{ext}"
+            outDir: URL(fileURLWithPath: "/renders")
         )
     }
 }
@@ -310,22 +289,7 @@ import Testing
             inputs: [],
             source: try BPM(120),
             targets: [try BPM(125)],
-            outDir: nil,
-            format: "wav",
-            nameTemplate: "{title}_{bpm}bpm.{ext}"
-        )
-    }
-}
-
-@Test func rejectsUnsupportedFormat() throws {
-    #expect(throws: PntCliError.unsupportedFormat("mp3")) {
-        _ = try OutputPlanner.plans(
-            input: URL(fileURLWithPath: "/tmp/song.wav"),
-            source: try BPM(120),
-            targets: [try BPM(125)],
-            outDir: nil,
-            format: "mp3",
-            nameTemplate: "{title}_{bpm}bpm.{ext}"
+            outDir: nil
         )
     }
 }
@@ -678,8 +642,7 @@ private func makeTestPlan(index: Int) throws -> OutputPlan {
         input: URL(fileURLWithPath: "/tmp/input-\(index).wav"),
         outputURL: URL(fileURLWithPath: "/tmp/output-\(index).wav"),
         source: try BPM(120),
-        target: try BPM(120 + Double(index)),
-        format: "wav"
+        target: try BPM(120 + Double(index))
     )
 }
 

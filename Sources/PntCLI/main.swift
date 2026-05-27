@@ -9,7 +9,7 @@ private let pntMissingWarning = """
    Install Pitch n' Time LE from Serato, then run `pnt-cli --help` again to confirm.
 """
 
-func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> [(URL, BPM)] {
+func resolveSources(for inputs: [URL], explicit: BPM?) throws -> [(URL, BPM)] {
     if let explicit {
         return inputs.map { ($0, explicit) }
     }
@@ -17,10 +17,6 @@ func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> 
     return try inputs.map { input in
         guard let detected = detector.detect(input: input) else {
             throw PntCliError.undetectableSource(input)
-        }
-        if verbose {
-            let label = inputs.count > 1 ? " for \(input.lastPathComponent)" : ""
-            print("detected source BPM \(detected.bpm.description) from \(detected.source)\(label)")
         }
         return (input, detected.bpm)
     }
@@ -47,31 +43,13 @@ private func sourceBPMDisplay(_ source: BPM?) -> String {
 }
 
 private func runRender(_ options: RenderOptions) throws {
-    let resolvedInputs = try resolveSources(
-        for: options.inputs,
-        explicit: options.source,
-        verbose: options.verbose
-    )
+    let resolvedInputs = try resolveSources(for: options.inputs, explicit: options.source)
 
     let plans = try OutputPlanner.plans(
         inputs: resolvedInputs,
         targets: options.targets,
-        outDir: options.outDir,
-        format: options.format,
-        nameTemplate: options.nameTemplate
+        outDir: options.outDir
     )
-
-    if options.dryRun {
-        for plan in plans {
-            print(
-                "\(plan.source.description) -> \(plan.target.description) BPM  " +
-                "time=\(String(format: "%.6f", plan.ratios.seratoTime))  " +
-                "duration=\(String(format: "%.6f", plan.ratios.outputDurationRatio))x  " +
-                "\(plan.outputURL.path)"
-            )
-        }
-        return
-    }
 
     try validateOutputsAvailable(plans, overwrite: options.overwrite)
 
@@ -91,12 +69,7 @@ private func runRender(_ options: RenderOptions) throws {
     RenderBatchRunner.forEach(plans: plans, jobs: jobs) { plan in
         do {
             let renderer = PitchNTimeRenderer()
-            _ = try renderer.render(
-                plan: plan,
-                overwrite: options.overwrite,
-                gain: options.gain,
-                tailMilliseconds: options.tailMilliseconds
-            )
+            _ = try renderer.render(plan: plan, overwrite: options.overwrite)
             reporter.recordCompleted()
         } catch {
             reporter.recordFailed(error)

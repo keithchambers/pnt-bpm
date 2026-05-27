@@ -107,22 +107,10 @@ when paths contain spaces or come from another command:
 pnt-cli -i "track one.wav" -i "track two.wav" --source 120 --target 125,128
 ```
 
-`--output` is accepted as an alias for `--target`:
-
-```sh
-pnt-cli song.wav --source 120 --output 125,128
-```
-
 Write files to a specific directory:
 
 ```sh
 pnt-cli song.aiff --source 120 --target 125,128 --out-dir renders
-```
-
-Preview what will be rendered without writing files:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128 --dry-run
 ```
 
 Overwrite existing output files:
@@ -131,39 +119,21 @@ Overwrite existing output files:
 pnt-cli song.aiff --source 120 --target 125,128 --overwrite
 ```
 
-Rendered WAVs automatically copy source track metadata and artwork when
+Rendered files automatically copy source track metadata and artwork when
 present. If the source metadata includes a BPM field, the copied metadata
 is updated to match each target BPM.
 
-Show detailed render ratios and progress:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125,128 --verbose
-```
-
-Default output names use this pattern:
-
-```text
-{title}_{bpm}bpm.wav
-```
-
-For example:
+Output filenames use this fixed pattern (extension matches the input):
 
 ```text
 song_125bpm.wav
-song_128bpm.wav
-```
-
-Use a custom output naming pattern:
-
-```sh
-pnt-cli song.aiff --source 120 --target 125 --name-template "{title}-serato-{bpm}.{ext}"
+song_128bpm.aiff
 ```
 
 When rendering multiple inputs into a shared `--out-dir`, `pnt-cli` refuses
 to start if two planned renders would write to the same output path (for
-example, two files both named `song` from different directories). This collision
-check runs before concurrent jobs start. Rename one of the inputs or render each
-one into its own directory to avoid the collision.
+example, two files both named `song.wav` from different directories). This
+collision check runs before concurrent jobs start. Rename one of the inputs
+or render each one into its own directory to avoid the collision.
 
-The current release writes WAV output at the input sample rate and channel count.
+Outputs are written at the input sample rate, channel count, and file format.

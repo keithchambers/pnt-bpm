@@ -9,7 +9,6 @@ public enum PntCliError: Error, CustomStringConvertible, Equatable {
     case invalidBPM(String)
     case invalidOption(String)
     case unsupportedInputFormat(URL)
-    case unsupportedFormat(String)
     case outputExists(URL)
     case outputCollision(URL)
     case metadataCopyFailed(URL, URL, String)
@@ -29,19 +28,17 @@ public enum PntCliError: Error, CustomStringConvertible, Equatable {
         case .undetectableSource(let url):
             return "could not auto-detect source BPM for \(url.lastPathComponent); pass --source <BPM>"
         case .missingTargets:
-            return "missing required --target/--output BPM values"
+            return "missing required --target BPM values"
         case .invalidBPM(let value):
             return "invalid BPM value: \(value)"
         case .invalidOption(let option):
             return "invalid option: \(option)"
         case .unsupportedInputFormat(let url):
             return "unsupported input format: \(url.lastPathComponent) (MP3 input is not supported)"
-        case .unsupportedFormat(let format):
-            return "unsupported output format: \(format)"
         case .outputExists(let url):
             return "output already exists: \(url.path) (use --overwrite to replace it)"
         case .outputCollision(let url):
-            return "multiple inputs would write to the same output: \(url.path) (use --name-template or --out-dir to disambiguate)"
+            return "multiple inputs would write to the same output: \(url.path) (use --out-dir to disambiguate)"
         case .metadataCopyFailed(let source, let target, let reason):
             return "could not copy metadata from \(source.lastPathComponent) to \(target.lastPathComponent): \(reason)"
         case .audioUnitNotFound:
