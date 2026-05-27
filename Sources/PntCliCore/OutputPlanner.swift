@@ -59,9 +59,10 @@ public struct OutputPlanner {
             let directory = outDir ?? input.deletingLastPathComponent()
             let title = input.deletingPathExtension().lastPathComponent
             let ext = input.pathExtension
+            let extensionSuffix = ext.isEmpty ? "" : ".\(ext)"
 
             for target in targets {
-                let filename = "\(title)_\(target.description)bpm.\(ext)"
+                let filename = "\(title)_\(target.description)bpm\(extensionSuffix)"
                 let outputURL = directory.appendingPathComponent(filename)
                 if !seenOutputs.insert(outputURL.standardizedFileURL.path).inserted {
                     throw PntCliError.outputCollision(outputURL)

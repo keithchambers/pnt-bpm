@@ -46,7 +46,6 @@ public final class Reporter: @unchecked Sendable {
             "Plan",
             "  Tracks       \(plan.tracks)",
             "  Source BPM   \(plan.sourceBPMDisplay)",
-            "",
             "  Target BPM   \(targets)",
             "  Output dir   \(plan.outDirDisplay)",
             ""
@@ -89,13 +88,19 @@ public final class Reporter: @unchecked Sendable {
         lock.withLock { skipped += 1 }
     }
 
-    public func finish() {
+    @discardableResult
+    public func finish() -> Error? {
         timer?.cancel()
         timer = nil
         if isTTY {
             clearLiveBlock()
         }
         printResult()
+        return firstFailure
+    }
+
+    public var firstFailure: Error? {
+        lock.withLock { firstError }
     }
 
     private func redraw() {

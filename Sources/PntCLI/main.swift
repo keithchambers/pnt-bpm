@@ -29,12 +29,26 @@ private func validateOutputsAvailable(_ plans: [OutputPlan], overwrite: Bool) th
     }
 }
 
-private func displayPath(for url: URL?) -> String {
-    let path = (url ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)).path
+private func displayPath(for url: URL) -> String {
+    let path = url.path
     let home = NSHomeDirectory()
     if path == home { return "~" }
     if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
     return path
+}
+
+private func outputDirDisplay(plans: [OutputPlan], explicitOutDir: URL?) -> String {
+    if let explicitOutDir {
+        return displayPath(for: explicitOutDir)
+    }
+
+    let directories = Set(
+        plans.map { $0.outputURL.deletingLastPathComponent().standardizedFileURL.path }
+    )
+    if directories.count == 1, let directory = directories.first {
+        return displayPath(for: URL(fileURLWithPath: directory))
+    }
+    return "next to each input"
 }
 
 private func sourceBPMDisplay(explicit: BPM?, resolved: [(URL, BPM)]) -> String {
@@ -63,7 +77,7 @@ private func runRender(_ options: RenderOptions) throws {
             tracks: options.inputs.count,
             sourceBPMDisplay: sourceBPMDisplay(explicit: options.source, resolved: resolvedInputs),
             targets: options.targets,
-            outDirDisplay: displayPath(for: options.outDir)
+            outDirDisplay: outputDirDisplay(plans: plans, explicitOutDir: options.outDir)
         )
     )
 
@@ -80,7 +94,9 @@ private func runRender(_ options: RenderOptions) throws {
         }
     }
 
-    reporter.finish()
+    if let failure = reporter.finish() {
+        throw failure
+    }
 }
 
 func run() throws {

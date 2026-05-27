@@ -29,6 +29,10 @@ import Testing
     #expect(options.targets.map(\.value) == [125, 122, 120])
 }
 
+@Test func parsesShortVersionFlag() throws {
+    #expect(try CLIParser.parse(["pnt-cli", "-v"]) == .version)
+}
+
 @Test func computesSeratoTimeAndDurationRatios() throws {
     let source = try BPM(120)
     let target = try BPM(128)
@@ -51,6 +55,17 @@ import Testing
         "/tmp/song_125bpm.aiff",
         "/tmp/song_128bpm.aiff"
     ])
+}
+
+@Test func outputNameOmitsTrailingDotWhenInputHasNoExtension() throws {
+    let plans = try OutputPlanner.plans(
+        input: URL(fileURLWithPath: "/tmp/song"),
+        source: try BPM(120),
+        targets: [try BPM(125)],
+        outDir: nil
+    )
+
+    #expect(plans.map { $0.outputURL.path } == ["/tmp/song_125bpm"])
 }
 
 @Test func rejectsMissingTargets() {
@@ -214,6 +229,18 @@ import Testing
     #expect(finished.wait(timeout: .now() + .seconds(2)) == .success)
     #expect(state.errorDescription == nil)
     #expect(state.values == [120, 121, 122, 123])
+}
+
+@Test func reporterExposesFirstRecordedFailure() {
+    let reporter = Reporter(forceTTY: false)
+    let expected = PntCliError.renderFailed("boom")
+
+    reporter.start(totalRenders: 2)
+    reporter.recordFailed(expected)
+    reporter.recordCompleted()
+    let failure = reporter.finish()
+
+    #expect((failure as? PntCliError) == expected)
 }
 
 @Test func multiInputPlansFanOutOverInputsAndTargets() throws {
