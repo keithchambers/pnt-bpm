@@ -268,11 +268,30 @@ import Testing
     let expected = PntCliError.renderFailed("boom")
 
     reporter.start(totalRenders: 2)
+    reporter.recordStarted()
     reporter.recordFailed(expected)
+    reporter.recordStarted()
     reporter.recordCompleted()
     let failure = reporter.finish()
 
     #expect((failure as? PntCliError) == expected)
+}
+
+@Test func reporterLiveStatusShowsActiveRenders() {
+    let line = Reporter.liveStatusLine(
+        spinner: "⠋",
+        done: 0,
+        total: 11,
+        active: 11,
+        elapsed: 2,
+        remaining: nil
+    )
+
+    #expect(line == "⠋  Rendering 0 of 11 done · 11 active · 0:02 elapsed")
+}
+
+@Test func reporterLiveBlockClearSequenceRewindsTwoPrintedLines() {
+    #expect(Reporter.clearLiveBlockSequence == "\u{1B}[1A\u{1B}[2K\r\u{1B}[1A\u{1B}[2K\r")
 }
 
 @Test func audioUnitLoadErrorsExplainRecovery() {

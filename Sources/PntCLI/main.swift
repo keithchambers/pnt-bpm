@@ -79,6 +79,7 @@ private func runRender(_ options: RenderOptions) throws {
 
     RenderBatchRunner.forEach(plans: plans, jobs: jobs) { plan in
         do {
+            reporter.recordStarted()
             let renderer = PitchNTimeRenderer()
             _ = try renderer.render(plan: plan, overwrite: options.overwrite)
             reporter.recordCompleted()

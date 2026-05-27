@@ -18,11 +18,13 @@ public final class Reporter: @unchecked Sendable {
 
     private static let spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     private static let barWidth = 38
+    static let clearLiveBlockSequence = "\u{1B}[1A\u{1B}[2K\r\u{1B}[1A\u{1B}[2K\r"
 
     private let isTTY: Bool
     private let lock = NSLock()
 
     private var totalRenders = 0
+    private var started = 0
     private var completed = 0
     private var failed = 0
     private var skipped = 0
@@ -56,6 +58,7 @@ public final class Reporter: @unchecked Sendable {
     public func start(totalRenders: Int) {
         lock.withLock {
             self.totalRenders = totalRenders
+            started = 0
             completed = 0
             failed = 0
             skipped = 0
@@ -71,6 +74,10 @@ public final class Reporter: @unchecked Sendable {
         }
         timer.resume()
         self.timer = timer
+    }
+
+    public func recordStarted() {
+        lock.withLock { started += 1 }
     }
 
     public func recordCompleted() {
@@ -104,34 +111,41 @@ public final class Reporter: @unchecked Sendable {
     }
 
     private func redraw() {
-        let snapshot: (done: Int, total: Int, fraction: Double, elapsed: TimeInterval, spinner: String)
+        let snapshot: (done: Int, total: Int, active: Int, fraction: Double, elapsed: TimeInterval, spinner: String)
         lock.lock()
         defer { lock.unlock() }
 
         guard let started = startedAt, totalRenders > 0 else { return }
         let done = completed + failed + skipped
+        let active = max(0, self.started - done)
         let fraction = min(1.0, Double(done) / Double(totalRenders))
         let elapsed = Date().timeIntervalSince(started)
         let spinner = Self.spinnerFrames[spinnerIndex % Self.spinnerFrames.count]
         spinnerIndex += 1
-        snapshot = (done, totalRenders, fraction, elapsed, spinner)
+        snapshot = (done, totalRenders, active, fraction, elapsed, spinner)
 
-        let etaSuffix: String
+        let remaining: TimeInterval?
         if snapshot.done > 0 && snapshot.done < snapshot.total {
             let rate = snapshot.elapsed / Double(snapshot.done)
-            let remaining = rate * Double(snapshot.total - snapshot.done)
-            etaSuffix = " · ~\(formatProgressTime(remaining)) remaining"
+            remaining = rate * Double(snapshot.total - snapshot.done)
         } else {
-            etaSuffix = ""
+            remaining = nil
         }
 
-        let line1 = "\(snapshot.spinner)  Rendering \(snapshot.done) of \(snapshot.total) · \(formatProgressTime(snapshot.elapsed)) elapsed\(etaSuffix)"
+        let line1 = Self.liveStatusLine(
+            spinner: snapshot.spinner,
+            done: snapshot.done,
+            total: snapshot.total,
+            active: snapshot.active,
+            elapsed: snapshot.elapsed,
+            remaining: remaining
+        )
         let bar = progressBar(fraction: snapshot.fraction, width: Self.barWidth)
         let pct = Int((snapshot.fraction * 100).rounded())
         let line2 = "   \(bar)  \(pct)%"
 
         if hasLiveBlock {
-            fputs("\u{1B}[2K\r\u{1B}[1A\u{1B}[2K\r", stdout)
+            fputs(Self.clearLiveBlockSequence, stdout)
         }
         fputs("\(line1)\n\(line2)\n", stdout)
         fflush(stdout)
@@ -142,7 +156,7 @@ public final class Reporter: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard hasLiveBlock else { return }
-        fputs("\u{1B}[2K\r\u{1B}[1A\u{1B}[2K\r", stdout)
+        fputs(Self.clearLiveBlockSequence, stdout)
         fflush(stdout)
         hasLiveBlock = false
     }
@@ -154,7 +168,7 @@ public final class Reporter: @unchecked Sendable {
         }
         let lines = [
             "Result",
-            "  ✓ \(done) rendered     ✗ \(fail) failed     ◌ \(skip) skipped     \(formatResultTime(elapsed))"
+            "  ✓ \(done) rendered     ✗ \(fail) failed     ◌ \(skip) skipped     \(Self.formatResultTime(elapsed))"
         ]
         print(lines.joined(separator: "\n"))
     }
@@ -164,12 +178,33 @@ public final class Reporter: @unchecked Sendable {
         return String(repeating: "█", count: filled) + String(repeating: "░", count: width - filled)
     }
 
-    private func formatProgressTime(_ seconds: TimeInterval) -> String {
+    static func liveStatusLine(
+        spinner: String,
+        done: Int,
+        total: Int,
+        active: Int,
+        elapsed: TimeInterval,
+        remaining: TimeInterval?
+    ) -> String {
+        var segments = [
+            "\(spinner)  Rendering \(done) of \(total) done"
+        ]
+        if active > 0 {
+            segments.append("\(active) active")
+        }
+        segments.append("\(formatProgressTime(elapsed)) elapsed")
+        if let remaining {
+            segments.append("~\(formatProgressTime(remaining)) remaining")
+        }
+        return segments.joined(separator: " · ")
+    }
+
+    private static func formatProgressTime(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
         return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 
-    private func formatResultTime(_ seconds: TimeInterval) -> String {
+    private static func formatResultTime(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
         let m = total / 60
         let s = total % 60
