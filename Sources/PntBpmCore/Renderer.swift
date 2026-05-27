@@ -143,7 +143,14 @@ public final class PitchNTimeRenderer {
         player.stop()
         engine.stop()
 
-        try TrackMetadataCopier().copy(from: plan.input, to: plan.outputURL, targetBPM: plan.target)
+        do {
+            try TrackMetadataCopier().copy(from: plan.input, to: plan.outputURL, targetBPM: plan.target)
+        } catch {
+            // Keep render output atomic: if metadata copy fails, don't leave a
+            // partially-tagged file on disk while reporting failure.
+            try? fileManager.removeItem(at: plan.outputURL)
+            throw error
+        }
 
         return RenderResult(
             outputURL: plan.outputURL,

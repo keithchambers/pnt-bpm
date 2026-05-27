@@ -37,29 +37,42 @@ public struct TrackMetadataCopier {
                 throw MetadataCopyError("could not open source or target audio file")
             }
 
+            let targetFormat = try fileFormat(of: targetFile)
+            let targetID3ChunkID = Self.id3ChunkID(for: targetFormat)
+            let copyableChunks = Self.copyableChunkIDs(for: targetFormat)
+
             var copiedChunks: [String] = []
             let copiedID3Tag = try copyID3Tag(
                 from: sourceFile,
                 to: targetFile,
-                targetBPM: targetBPM
+                targetBPM: targetBPM,
+                targetChunkID: targetID3ChunkID
             )
             if copiedID3Tag {
-                copiedChunks.append(Self.fourCCString(Self.id3ChunkID))
+                copiedChunks.append(Self.fourCCString(targetID3ChunkID))
             }
 
-            for chunkID in try metadataChunkIDs(from: sourceFile) {
+            for chunkID in try metadataChunkIDs(from: sourceFile, allowed: copyableChunks) {
                 if copiedID3Tag && Self.id3ChunkIDs.contains(chunkID) {
                     continue
                 }
 
+                // Rename ID3 chunks to the target-canonical case when falling
+                // back to the user-data path (RIFF/WAVE uses "id3 ", AIFF uses
+                // "ID3 ").
+                let outputChunkID = Self.id3ChunkIDs.contains(chunkID)
+                    ? targetID3ChunkID
+                    : chunkID
+
                 let copiedCount = try copyUserDataChunk(
-                    chunkID,
+                    sourceChunkID: chunkID,
+                    outputChunkID: outputChunkID,
                     from: sourceFile,
                     to: targetFile,
                     targetBPM: targetBPM
                 )
                 copiedChunks.append(
-                    contentsOf: Array(repeating: Self.fourCCString(chunkID), count: copiedCount)
+                    contentsOf: Array(repeating: Self.fourCCString(outputChunkID), count: copiedCount)
                 )
             }
 
@@ -83,17 +96,29 @@ public struct TrackMetadataCopier {
     private func copyID3Tag(
         from sourceFile: AudioFileID,
         to targetFile: AudioFileID,
-        targetBPM: BPM
+        targetBPM: BPM,
+        targetChunkID: UInt32
     ) throws -> Bool {
         guard var id3Tag = try propertyData(kAudioFilePropertyID3Tag, from: sourceFile) else {
             return false
         }
         id3Tag = Self.updatedID3Tag(id3Tag, targetBPM: targetBPM.description)
-        try writeUserData(id3Tag, chunkID: Self.id3ChunkID, index: 0, to: targetFile)
+        try writeUserData(id3Tag, chunkID: targetChunkID, index: 0, to: targetFile)
         return true
     }
 
-    private func metadataChunkIDs(from sourceFile: AudioFileID) throws -> [UInt32] {
+    private func fileFormat(of file: AudioFileID) throws -> AudioFileTypeID {
+        var format: AudioFileTypeID = 0
+        var size = UInt32(MemoryLayout<AudioFileTypeID>.size)
+        let status = AudioFileGetProperty(file, kAudioFilePropertyFileFormat, &size, &format)
+        try requireNoErr(status, "AudioFileGetProperty failed for kAudioFilePropertyFileFormat")
+        return format
+    }
+
+    private func metadataChunkIDs(
+        from sourceFile: AudioFileID,
+        allowed: Set<UInt32>
+    ) throws -> [UInt32] {
         guard let data = try propertyData(kAudioFilePropertyChunkIDs, from: sourceFile) else {
             return []
         }
@@ -105,7 +130,7 @@ public struct TrackMetadataCopier {
             let ids = rawBuffer.bindMemory(to: UInt32.self)
             var seen: Set<UInt32> = []
             var result: [UInt32] = []
-            for id in ids where Self.copyableMetadataChunkIDs.contains(id) && seen.insert(id).inserted {
+            for id in ids where allowed.contains(id) && seen.insert(id).inserted {
                 result.append(id)
             }
             return result
@@ -113,43 +138,44 @@ public struct TrackMetadataCopier {
     }
 
     private func copyUserDataChunk(
-        _ chunkID: UInt32,
+        sourceChunkID: UInt32,
+        outputChunkID: UInt32,
         from sourceFile: AudioFileID,
         to targetFile: AudioFileID,
         targetBPM: BPM
     ) throws -> Int {
         var count: UInt32 = 0
-        let countStatus = AudioFileCountUserData(sourceFile, chunkID, &count)
+        let countStatus = AudioFileCountUserData(sourceFile, sourceChunkID, &count)
         if countStatus == kAudioFileInvalidChunkError {
             return 0
         }
-        try requireNoErr(countStatus, "AudioFileCountUserData failed for \(Self.fourCCString(chunkID))")
+        try requireNoErr(countStatus, "AudioFileCountUserData failed for \(Self.fourCCString(sourceChunkID))")
 
         var copiedCount = 0
         for index in 0..<count {
             var size: UInt32 = 0
-            let sizeStatus = AudioFileGetUserDataSize(sourceFile, chunkID, index, &size)
-            try requireNoErr(sizeStatus, "AudioFileGetUserDataSize failed for \(Self.fourCCString(chunkID))")
+            let sizeStatus = AudioFileGetUserDataSize(sourceFile, sourceChunkID, index, &size)
+            try requireNoErr(sizeStatus, "AudioFileGetUserDataSize failed for \(Self.fourCCString(sourceChunkID))")
             if size == 0 {
                 continue
             }
 
             var data = Data(count: Int(size))
             let readStatus = data.withUnsafeMutableBytes { bytes in
-                AudioFileGetUserData(sourceFile, chunkID, index, &size, bytes.baseAddress!)
+                AudioFileGetUserData(sourceFile, sourceChunkID, index, &size, bytes.baseAddress!)
             }
-            try requireNoErr(readStatus, "AudioFileGetUserData failed for \(Self.fourCCString(chunkID))")
+            try requireNoErr(readStatus, "AudioFileGetUserData failed for \(Self.fourCCString(sourceChunkID))")
 
             if data.count != Int(size) {
                 data.removeSubrange(Int(size)..<data.count)
             }
             data = Self.updatedMetadataChunk(
                 data,
-                chunkID: chunkID,
+                chunkID: sourceChunkID,
                 targetBPM: targetBPM.description
             )
 
-            try writeUserData(data, chunkID: chunkID, index: UInt32(copiedCount), to: targetFile)
+            try writeUserData(data, chunkID: outputChunkID, index: UInt32(copiedCount), to: targetFile)
             copiedCount += 1
         }
 
@@ -448,17 +474,19 @@ public struct TrackMetadataCopier {
         return Int(size) + 4
     }
 
-    private static let id3ChunkID = fourCC("ID3 ")
+    private static let id3UppercaseChunkID = fourCC("ID3 ")
     private static let id3LowercaseChunkID = fourCC("id3 ")
-    private static let id3ChunkIDs: Set<UInt32> = [id3ChunkID, id3LowercaseChunkID]
+    private static let id3ChunkID = id3UppercaseChunkID
+    private static let id3ChunkIDs: Set<UInt32> = [id3UppercaseChunkID, id3LowercaseChunkID]
     private static let riffInfoBPMChunkIDs: Set<UInt32> = [
         fourCC("IBPM"),
         fourCC("TBPM")
     ]
 
-    private static let copyableMetadataChunkIDs: Set<UInt32> = [
-        fourCC("ID3 "),
-        fourCC("id3 "),
+    // RIFF/WAVE-canonical chunks (plus both ID3 case variants for tolerance).
+    private static let wavCopyableChunkIDs: Set<UInt32> = [
+        id3UppercaseChunkID,
+        id3LowercaseChunkID,
         fourCC("LIST"),
         fourCC("bext"),
         fourCC("iXML"),
@@ -472,7 +500,13 @@ public struct TrackMetadataCopier {
         fourCC("note"),
         fourCC("ltxt"),
         fourCC("smpl"),
-        fourCC("inst"),
+        fourCC("inst")
+    ]
+
+    // AIFF-canonical chunks (plus both ID3 case variants for tolerance).
+    private static let aiffCopyableChunkIDs: Set<UInt32> = [
+        id3UppercaseChunkID,
+        id3LowercaseChunkID,
         fourCC("INST"),
         fourCC("MARK"),
         fourCC("COMT"),
@@ -482,6 +516,24 @@ public struct TrackMetadataCopier {
         fourCC("(c) "),
         fourCC("APPL")
     ]
+
+    private static func copyableChunkIDs(for format: AudioFileTypeID) -> Set<UInt32> {
+        switch format {
+        case kAudioFileWAVEType:
+            return wavCopyableChunkIDs
+        case kAudioFileAIFFType, kAudioFileAIFCType:
+            return aiffCopyableChunkIDs
+        default:
+            // Unknown target: only attempt the universally-supported ID3 path.
+            return id3ChunkIDs
+        }
+    }
+
+    private static func id3ChunkID(for format: AudioFileTypeID) -> UInt32 {
+        // RIFF/WAVE convention is the lowercase "id3 " chunk id; AIFF and
+        // anything else use the uppercase "ID3 " variant.
+        format == kAudioFileWAVEType ? id3LowercaseChunkID : id3UppercaseChunkID
+    }
 
     private static func fourCC(_ string: String) -> UInt32 {
         precondition(string.utf8.count == 4, "fourCC values must be exactly four bytes")

@@ -352,10 +352,12 @@ import Testing
     )
 
     #expect(result.didCopyMetadata)
-    #expect(result.copiedChunks.contains("ID3 "))
+    // WAV targets should get the lowercase RIFF-canonical "id3 " chunk id.
+    #expect(result.copiedChunks.contains("id3 "))
+    #expect(!result.copiedChunks.contains("ID3 "))
 
-    guard let copiedTag = riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) else {
-        Issue.record("expected copied ID3 chunk")
+    guard let copiedTag = riffChunkData(id: "id3 ", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied id3 chunk")
         return
     }
 
@@ -455,8 +457,8 @@ import Testing
         targetBPM: try BPM(128)
     )
 
-    guard let copiedTag = riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) else {
-        Issue.record("expected copied ID3 chunk")
+    guard let copiedTag = riffChunkData(id: "id3 ", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied id3 chunk")
         return
     }
 
@@ -491,8 +493,8 @@ import Testing
         targetBPM: try BPM(128)
     )
 
-    guard let copiedTag = riffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) else {
-        Issue.record("expected copied ID3 chunk")
+    guard let copiedTag = riffChunkData(id: "id3 ", in: try Data(contentsOf: target)) else {
+        Issue.record("expected copied id3 chunk")
         return
     }
 
@@ -500,6 +502,115 @@ import Testing
     // it was rather than being silently invalidated by a plain-text rewrite.
     #expect(id3v23TextFrameValue(id: "TIT2", in: copiedTag) == "Source Track")
     #expect(id3v23FramePayload(id: "TBPM", in: copiedTag) == Data([0x00] + Array("99".utf8)))
+}
+
+@Test func writesUppercaseID3ChunkToAIFFTarget() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.aiff")
+    let target = directory.appendingPathComponent("target.aiff")
+    let id3Tag = makeID3v23Tag(frames: [
+        makeID3v23TextFrame(id: "TBPM", value: "99")
+    ])
+
+    try makeAIFFWithID3Tag(id3Tag).write(to: source)
+    try makeAIFFWithID3Tag(makeID3v23Tag(frames: [])).write(to: target)
+
+    let result = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(120)
+    )
+
+    // AIFF keeps the uppercase "ID3 " chunk id.
+    #expect(result.copiedChunks.contains("ID3 "))
+    #expect(!result.copiedChunks.contains("id3 "))
+    #expect(aiffChunkData(id: "ID3 ", in: try Data(contentsOf: target)) != nil)
+}
+
+@Test func skipsAIFFOnlyChunksWhenWritingToWAVTarget() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pnt-bpm-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let source = directory.appendingPathComponent("source.aiff")
+    let target = directory.appendingPathComponent("target.wav")
+
+    // AIFF-only chunks like NAME / AUTH / ANNO have no meaning in RIFF/WAVE
+    // and shouldn't bleed into a WAV target as non-standard chunks.
+    let aiffWithAIFFChunks = makeAIFFWithAIFFOnlyChunks(
+        nameValue: "Source Track",
+        authorValue: "Source Artist"
+    )
+    try aiffWithAIFFChunks.write(to: source)
+    try makeWAV().write(to: target)
+
+    let result = try TrackMetadataCopier().copy(
+        from: source,
+        to: target,
+        targetBPM: try BPM(125)
+    )
+
+    #expect(!result.copiedChunks.contains("NAME"))
+    #expect(!result.copiedChunks.contains("AUTH"))
+
+    let bytes = try Data(contentsOf: target)
+    #expect(riffChunkData(id: "NAME", in: bytes) == nil)
+    #expect(riffChunkData(id: "AUTH", in: bytes) == nil)
+}
+
+private func makeAIFFWithAIFFOnlyChunks(nameValue: String, authorValue: String) -> Data {
+    let commonChunk = Data([
+        0x00, 0x02,
+        0x00, 0x00, 0x00, 0x01,
+        0x00, 0x10,
+        0x40, 0x0e, 0xac, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    ])
+    let soundChunk = Data([
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    ])
+
+    var body = Data()
+    body.appendASCII("AIFF")
+    body.appendAIFFChunk(id: "COMM", payload: commonChunk)
+    body.appendAIFFChunk(id: "SSND", payload: soundChunk)
+    body.appendAIFFChunk(id: "NAME", payload: Data(nameValue.utf8))
+    body.appendAIFFChunk(id: "AUTH", payload: Data(authorValue.utf8))
+
+    var file = Data()
+    file.appendASCII("FORM")
+    file.appendUInt32BE(UInt32(body.count))
+    file.append(body)
+    return file
+}
+
+private func aiffChunkData(id: String, in data: Data) -> Data? {
+    guard data.count >= 12,
+          String(bytes: data[0..<4], encoding: .ascii) == "FORM",
+          String(bytes: data[8..<12], encoding: .ascii) == "AIFF" else {
+        return nil
+    }
+
+    var offset = 12
+    while offset + 8 <= data.count {
+        let chunkID = String(bytes: data[offset..<(offset + 4)], encoding: .ascii)
+        let chunkSize = Int(data.uint32BE(at: offset + 4))
+        let payloadStart = offset + 8
+        let payloadEnd = payloadStart + chunkSize
+        guard payloadEnd <= data.count else { return nil }
+        if chunkID == id {
+            return Data(data[payloadStart..<payloadEnd])
+        }
+        offset = payloadEnd + (chunkSize % 2)
+    }
+
+    return nil
 }
 
 private func countRIFFChunks(id: String, in data: Data) -> Int {
