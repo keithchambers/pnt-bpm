@@ -61,12 +61,12 @@ public struct OutputPlanner {
         nameTemplate: String
     ) throws -> [OutputPlan] {
         guard !inputs.isEmpty else {
-            throw PntBpmError.missingInput
+            throw PntCliError.missingInput
         }
 
         let normalizedFormat = format.lowercased()
         guard normalizedFormat == "wav" else {
-            throw PntBpmError.unsupportedFormat(format)
+            throw PntCliError.unsupportedFormat(format)
         }
 
         var plans: [OutputPlan] = []
@@ -85,7 +85,7 @@ public struct OutputPlanner {
                 )
                 let outputURL = directory.appendingPathComponent(filename)
                 if !seenOutputs.insert(outputURL.standardizedFileURL.path).inserted {
-                    throw PntBpmError.outputCollision(outputURL)
+                    throw PntCliError.outputCollision(outputURL)
                 }
                 plans.append(
                     OutputPlan(

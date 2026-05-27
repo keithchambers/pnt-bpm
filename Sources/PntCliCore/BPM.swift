@@ -5,7 +5,7 @@ public struct BPM: Equatable, Comparable, Sendable, CustomStringConvertible {
 
     public init(_ value: Double) throws {
         guard value.isFinite, value > 0, value <= 999 else {
-            throw PntBpmError.invalidBPM(String(value))
+            throw PntCliError.invalidBPM(String(value))
         }
         self.value = value
     }
@@ -57,19 +57,19 @@ public func parseBPMList(_ values: [String]) throws -> [BPM] {
             .filter { !$0.isEmpty }
 
         guard !pieces.isEmpty else {
-            throw PntBpmError.invalidBPM(raw)
+            throw PntCliError.invalidBPM(raw)
         }
 
         for piece in pieces {
             guard let value = Double(piece) else {
-                throw PntBpmError.invalidBPM(piece)
+                throw PntCliError.invalidBPM(piece)
             }
             targets.append(try BPM(value))
         }
     }
 
     guard !targets.isEmpty else {
-        throw PntBpmError.missingTargets
+        throw PntCliError.missingTargets
     }
 
     return targets

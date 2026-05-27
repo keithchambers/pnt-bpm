@@ -1,6 +1,6 @@
 import Foundation
 
-public enum PntBpmError: Error, CustomStringConvertible, Equatable {
+public enum PntCliError: Error, CustomStringConvertible, Equatable {
     case usage(String)
     case missingInput
     case missingSource

@@ -45,7 +45,7 @@ public final class PitchNTimeRenderer {
     ) throws -> RenderResult {
         if fileManager.fileExists(atPath: plan.outputURL.path) {
             guard overwrite else {
-                throw PntBpmError.outputExists(plan.outputURL)
+                throw PntCliError.outputExists(plan.outputURL)
             }
             try fileManager.removeItem(at: plan.outputURL)
         }
@@ -89,7 +89,7 @@ public final class PitchNTimeRenderer {
             pcmFormat: engine.manualRenderingFormat,
             frameCapacity: engine.manualRenderingMaximumFrameCount
         ) else {
-            throw PntBpmError.renderFailed("could not allocate render buffer")
+            throw PntCliError.renderFailed("could not allocate render buffer")
         }
 
         var renderedFrames: AVAudioFramePosition = 0
@@ -133,9 +133,9 @@ public final class PitchNTimeRenderer {
                     if idlePolls >= maxIdlePolls { break renderLoop }
                     continue
                 case .error:
-                    throw PntBpmError.renderFailed("AVAudioEngine manual render returned an error")
+                    throw PntCliError.renderFailed("AVAudioEngine manual render returned an error")
                 @unknown default:
-                    throw PntBpmError.renderFailed("AVAudioEngine manual render returned an unknown status")
+                    throw PntCliError.renderFailed("AVAudioEngine manual render returned an unknown status")
                 }
             }
         }
@@ -165,7 +165,7 @@ public final class PitchNTimeRenderer {
     private func wavSettings(for format: AVAudioFormat) throws -> [String: Any] {
         let channelCount = Int(format.channelCount)
         guard channelCount > 0 else {
-            throw PntBpmError.renderFailed("input has no audio channels")
+            throw PntCliError.renderFailed("input has no audio channels")
         }
 
         return [

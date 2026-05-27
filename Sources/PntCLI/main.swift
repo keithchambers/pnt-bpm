@@ -1,6 +1,6 @@
 import Darwin
 import Foundation
-import PntBpmCore
+import PntCliCore
 
 func durationString(_ seconds: Double) -> String {
     let minutes = Int(seconds) / 60
@@ -40,7 +40,7 @@ func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> 
     let detector = SourceBPMDetector()
     return try inputs.map { input in
         guard let detected = detector.detect(input: input) else {
-            throw PntBpmError.undetectableSource(input)
+            throw PntCliError.undetectableSource(input)
         }
         let label = inputs.count > 1 ? " for \(input.lastPathComponent)" : ""
         if verbose {
@@ -56,7 +56,7 @@ private func validateOutputsAvailable(_ plans: [OutputPlan], overwrite: Bool) th
     guard !overwrite else { return }
 
     for plan in plans where FileManager.default.fileExists(atPath: plan.outputURL.path) {
-        throw PntBpmError.outputExists(plan.outputURL)
+        throw PntCliError.outputExists(plan.outputURL)
     }
 }
 
@@ -106,7 +106,7 @@ func run() throws {
         print(helpText)
 
     case .version:
-        print(pntBpmVersion)
+        print(pntCliVersion)
 
     case .doctor(let verbose):
         let report = try PitchNTimeAudioUnit.doctor()
@@ -176,10 +176,10 @@ func run() throws {
 
 do {
     try run()
-} catch let error as PntBpmError {
-    fputs("pnt-bpm: \(error.description)\n", stderr)
+} catch let error as PntCliError {
+    fputs("pnt-cli: \(error.description)\n", stderr)
     exit(1)
 } catch {
-    fputs("pnt-bpm: \(error.localizedDescription)\n", stderr)
+    fputs("pnt-cli: \(error.localizedDescription)\n", stderr)
     exit(1)
 }

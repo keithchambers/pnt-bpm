@@ -78,9 +78,9 @@ public struct TrackMetadataCopier {
 
             return TrackMetadataCopyResult(copiedChunks: copiedChunks)
         } catch let error as MetadataCopyError {
-            throw PntBpmError.metadataCopyFailed(sourceURL, targetURL, error.description)
+            throw PntCliError.metadataCopyFailed(sourceURL, targetURL, error.description)
         } catch {
-            throw PntBpmError.metadataCopyFailed(sourceURL, targetURL, String(describing: error))
+            throw PntCliError.metadataCopyFailed(sourceURL, targetURL, String(describing: error))
         }
     }
 
