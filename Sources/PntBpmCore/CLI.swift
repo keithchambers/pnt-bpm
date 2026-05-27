@@ -200,7 +200,7 @@ public struct CLIParser {
     }
 }
 
-public let pntBpmVersion = "1.0.0"
+public let pntBpmVersion = "1.0.1"
 
 public let helpText = """
 pnt-bpm \(pntBpmVersion)

@@ -27,9 +27,9 @@ Requirements:
 
 Download the macOS release package:
 
-[pnt-bpm-1.0.0.pkg](https://github.com/keithchambers/pnt-bpm/releases/download/v1.0.0/pnt-bpm-1.0.0.pkg)
+[pnt-bpm-1.0.1.pkg](https://github.com/keithchambers/pnt-bpm/releases/download/v1.0.1/pnt-bpm-1.0.1.pkg)
 
-Open `pnt-bpm-1.0.0.pkg` and follow the installer prompts.
+Open `pnt-bpm-1.0.1.pkg` and follow the installer prompts.
 
 Verify that the CLI can load Serato Pitch n' Time:
 
