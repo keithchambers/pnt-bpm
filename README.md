@@ -34,8 +34,12 @@ Open `pnt-cli-1.0.0.pkg` and follow the installer prompts.
 Verify that the CLI can load Serato Pitch n' Time:
 
 ```sh
-pnt-cli --doctor --verbose
+pnt-cli --help
 ```
+
+If Pitch n' Time LE isn't installed (or can't be loaded), `pnt-cli` prints
+the help text followed by a warning explaining that Pitch n' Time LE is
+required, and exits with status 1.
 
 ## Usage
 

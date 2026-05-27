@@ -2,7 +2,6 @@ import Foundation
 
 public enum Command: Equatable, Sendable {
     case render(RenderOptions)
-    case doctor(verbose: Bool)
     case help
     case version
 }
@@ -117,8 +116,6 @@ public struct CLIParser {
                 return .help
             case "--version":
                 return .version
-            case "--doctor":
-                return .doctor(verbose: verbose || args.contains("--verbose"))
             case "-i", "--input":
                 inputPaths.append(try popValue(after: arg))
             case "-s", "--source":
@@ -269,9 +266,6 @@ SERATO:
       Default: 0
 
 UTILITY:
-  --doctor
-      Verify Serato Pitch n Time LE can be loaded.
-
   --dry-run
       Print planned renders without writing files.
 

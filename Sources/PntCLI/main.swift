@@ -2,36 +2,12 @@ import Darwin
 import Foundation
 import PntCliCore
 
-func durationString(_ seconds: Double) -> String {
-    let minutes = Int(seconds) / 60
-    let remainder = seconds - Double(minutes * 60)
-    return String(format: "%d:%06.3f", minutes, remainder)
-}
+private let pntMissingWarning = """
 
-func printPlan(_ plan: OutputPlan) {
-    print(
-        "\(plan.source.description) -> \(plan.target.description) BPM  " +
-        "time=\(String(format: "%.6f", plan.ratios.seratoTime))  " +
-        "duration=\(String(format: "%.6f", plan.ratios.outputDurationRatio))x  " +
-        "\(plan.outputURL.path)"
-    )
-}
-
-private final class LockedPrinter: @unchecked Sendable {
-    private let lock = NSLock()
-
-    func line(_ message: String) {
-        lock.withLock {
-            print(message)
-        }
-    }
-
-    func plan(_ plan: OutputPlan) {
-        lock.withLock {
-            printPlan(plan)
-        }
-    }
-}
+⚠  Serato Pitch n' Time LE is not installed (or not loadable).
+   pnt-cli needs the Pitch n' Time LE Audio Unit to render audio.
+   Install Pitch n' Time LE from Serato, then run `pnt-cli --help` again to confirm.
+"""
 
 func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> [(URL, BPM)] {
     if let explicit {
@@ -42,11 +18,9 @@ func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> 
         guard let detected = detector.detect(input: input) else {
             throw PntCliError.undetectableSource(input)
         }
-        let label = inputs.count > 1 ? " for \(input.lastPathComponent)" : ""
         if verbose {
+            let label = inputs.count > 1 ? " for \(input.lastPathComponent)" : ""
             print("detected source BPM \(detected.bpm.description) from \(detected.source)\(label)")
-        } else {
-            print("source BPM \(detected.bpm.description) (auto-detected)\(label)")
         }
         return (input, detected.bpm)
     }
@@ -54,123 +28,107 @@ func resolveSources(for inputs: [URL], explicit: BPM?, verbose: Bool) throws -> 
 
 private func validateOutputsAvailable(_ plans: [OutputPlan], overwrite: Bool) throws {
     guard !overwrite else { return }
-
     for plan in plans where FileManager.default.fileExists(atPath: plan.outputURL.path) {
         throw PntCliError.outputExists(plan.outputURL)
     }
 }
 
-@discardableResult
-private func renderPlan(
-    _ plan: OutputPlan,
-    options: RenderOptions,
-    renderer: PitchNTimeRenderer,
-    printer: LockedPrinter,
-    progressLabel: String?
-) throws -> RenderResult {
-    if options.verbose {
-        printer.plan(plan)
-    } else {
-        printer.line("\(plan.target.description) BPM -> \(plan.outputURL.path)")
+private func displayPath(for url: URL?) -> String {
+    let path = (url ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)).path
+    let home = NSHomeDirectory()
+    if path == home { return "~" }
+    if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
+    return path
+}
+
+private func sourceBPMDisplay(_ source: BPM?) -> String {
+    if let source { return source.description }
+    return "auto-detected"
+}
+
+private func runRender(_ options: RenderOptions) throws {
+    let resolvedInputs = try resolveSources(
+        for: options.inputs,
+        explicit: options.source,
+        verbose: options.verbose
+    )
+
+    let plans = try OutputPlanner.plans(
+        inputs: resolvedInputs,
+        targets: options.targets,
+        outDir: options.outDir,
+        format: options.format,
+        nameTemplate: options.nameTemplate
+    )
+
+    if options.dryRun {
+        for plan in plans {
+            print(
+                "\(plan.source.description) -> \(plan.target.description) BPM  " +
+                "time=\(String(format: "%.6f", plan.ratios.seratoTime))  " +
+                "duration=\(String(format: "%.6f", plan.ratios.outputDurationRatio))x  " +
+                "\(plan.outputURL.path)"
+            )
+        }
+        return
     }
 
-    var lastProgressBucket = -1
-    let result = try renderer.render(
-        plan: plan,
-        overwrite: options.overwrite,
-        gain: options.gain,
-        tailMilliseconds: options.tailMilliseconds
-    ) { progress in
-        guard options.verbose else { return }
-        let bucket = Int((progress.fraction * 100).rounded(.down))
-        if bucket >= lastProgressBucket + 10 || bucket == 100 {
-            lastProgressBucket = bucket
-            if let progressLabel {
-                printer.line("  \(progressLabel): \(bucket)%")
-            } else {
-                printer.line("  \(bucket)%")
-            }
+    try validateOutputsAvailable(plans, overwrite: options.overwrite)
+
+    let reporter = Reporter()
+    reporter.printPlan(
+        Reporter.Plan(
+            tracks: options.inputs.count,
+            sourceBPMDisplay: sourceBPMDisplay(options.source),
+            targets: options.targets,
+            outDirDisplay: displayPath(for: options.outDir)
+        )
+    )
+
+    reporter.start(totalRenders: plans.count)
+    let jobs = RenderOptions.defaultJobs
+
+    RenderBatchRunner.forEach(plans: plans, jobs: jobs) { plan in
+        do {
+            let renderer = PitchNTimeRenderer()
+            _ = try renderer.render(
+                plan: plan,
+                overwrite: options.overwrite,
+                gain: options.gain,
+                tailMilliseconds: options.tailMilliseconds
+            )
+            reporter.recordCompleted()
+        } catch {
+            reporter.recordFailed(error)
         }
     }
 
-    printer.line(
-        "  wrote \(result.outputURL.path) " +
-        "(\(durationString(result.inputDuration)) -> \(durationString(result.outputDuration)))"
-    )
-    return result
+    reporter.finish()
 }
 
 func run() throws {
-    switch try CLIParser.parse(CommandLine.arguments) {
-    case .help:
-        print(helpText)
+    let command = try CLIParser.parse(CommandLine.arguments)
 
+    switch command {
     case .version:
         print(pntCliVersion)
+        return
 
-    case .doctor(let verbose):
-        let report = try PitchNTimeAudioUnit.doctor()
-        print("Serato Pitch n Time LE: OK")
-        print("Name: \(report.name)")
-        print("Manufacturer: \(report.manufacturer)")
-        if verbose {
-            print("Parameters:")
-            for parameter in report.parameters {
-                print("  \(parameter)")
-            }
+    case .help:
+        print(helpText)
+        if !PitchNTimeAudioUnit.isAvailable() {
+            fputs(pntMissingWarning + "\n", stderr)
+            exit(1)
         }
+        return
 
     case .render(let options):
-        let resolvedInputs = try resolveSources(
-            for: options.inputs,
-            explicit: options.source,
-            verbose: options.verbose
-        )
-
-        let plans = try OutputPlanner.plans(
-            inputs: resolvedInputs,
-            targets: options.targets,
-            outDir: options.outDir,
-            format: options.format,
-            nameTemplate: options.nameTemplate
-        )
-
-        if options.dryRun {
-            for plan in plans {
-                printPlan(plan)
-            }
-            return
+        guard PitchNTimeAudioUnit.isAvailable() else {
+            print(helpText)
+            fputs(pntMissingWarning + "\n", stderr)
+            exit(1)
         }
-
-        try validateOutputsAvailable(plans, overwrite: options.overwrite)
-        let printer = LockedPrinter()
-        let jobs = RenderOptions.defaultJobs
-
-        if jobs == 1 {
-            let renderer = PitchNTimeRenderer()
-            for plan in plans {
-                try renderPlan(
-                    plan,
-                    options: options,
-                    renderer: renderer,
-                    printer: printer,
-                    progressLabel: nil
-                )
-            }
-        } else {
-            _ = try RenderBatchRunner.render(
-                plans: plans,
-                jobs: jobs
-            ) { plan in
-                try renderPlan(
-                    plan,
-                    options: options,
-                    renderer: PitchNTimeRenderer(),
-                    printer: printer,
-                    progressLabel: plan.outputURL.lastPathComponent
-                )
-            }
-        }
+        try runRender(options)
     }
 }
 

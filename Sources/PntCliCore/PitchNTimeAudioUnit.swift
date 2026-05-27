@@ -2,16 +2,19 @@
 import AudioToolbox
 import Foundation
 
-public struct PitchNTimeDoctorReport: Equatable {
-    public let name: String
-    public let manufacturer: String
-    public let parameters: [String]
-}
-
 public enum PitchNTimeAudioUnit {
     public static let pitchAddress: AUParameterAddress = 0
     public static let timeAddress: AUParameterAddress = 1
     public static let gainAddress: AUParameterAddress = 2
+
+    public static func isAvailable() -> Bool {
+        do {
+            _ = try instantiate()
+            return true
+        } catch {
+            return false
+        }
+    }
 
     public static func instantiate() throws -> AVAudioUnit {
         let description = AudioComponentDescription(
@@ -43,19 +46,6 @@ public enum PitchNTimeAudioUnit {
 
         try verifyRequiredParameters(unit)
         return unit
-    }
-
-    public static func doctor() throws -> PitchNTimeDoctorReport {
-        let unit = try instantiate()
-        let parameters = unit.auAudioUnit.parameterTree?.allParameters.map {
-            "\($0.address): \($0.displayName) value=\($0.value) min=\($0.minValue) max=\($0.maxValue)"
-        } ?? []
-
-        return PitchNTimeDoctorReport(
-            name: unit.name,
-            manufacturer: unit.manufacturerName,
-            parameters: parameters
-        )
     }
 
     public static func configure(_ unit: AVAudioUnit, time: Double, gain: Float) throws {
