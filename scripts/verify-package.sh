@@ -78,7 +78,7 @@ require_equal "$binary_version" "$version" "Release binary version"
 
 if [[ "${PNT_CLI_REQUIRE_SIGNED_BINARY:-0}" = "1" ]]; then
   /usr/bin/codesign --verify --verbose=2 "$binary"
-  codesign_output="$(/usr/bin/codesign -dv "$binary" 2>&1)"
+  codesign_output="$(/usr/bin/codesign -dvvv "$binary" 2>&1)"
   echo "$codesign_output"
   require_contains "$codesign_output" "Authority=Developer ID Application:" "Release binary signature"
 
