@@ -185,9 +185,10 @@ REQUIRED:
 SOURCE:
   -s, --source <BPM>
       Source tempo of the input song. If omitted, pnt-bpm tries to detect
-      it from embedded metadata (ID3 TBPM, iTunes tmpo), the input
-      filename (Beatport "__BPM__" pattern), or up to three parent
-      directory names (mvsep-style "...-original-mix-125-bb-minor").
+      it from Beatport-purchased tracks only — either the ID3 TBPM frame
+      embedded in the file's metadata, or the BPM slot in Beatport's
+      filename convention ("..._(Mix)__<BPM>__<Key>.aiff"). If neither
+      is present, pnt-bpm errors out rather than guessing.
 
 OUTPUT:
   -d, --out-dir <DIR>

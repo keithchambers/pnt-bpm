@@ -97,37 +97,31 @@ import Testing
 }
 
 @Test func detectsBeatportFilenameBPM() {
-    let bpm = SourceBPMDetector.scanForBPM(
-        in: "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor"
+    let bpm = SourceBPMDetector.scanBeatportFilename(
+        "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor"
     )
     #expect(bpm?.value == 125)
 }
 
 @Test func ignoresBeatportTrackIdInBPMSlot() {
     // Older Beatport AIFFs used a 7–8 digit track ID in the same slot.
-    let bpm = SourceBPMDetector.scanForBPM(
-        in: "Emi_Galvan_Samsara_(Original_Mix)__17628366__E_Major"
+    let bpm = SourceBPMDetector.scanBeatportFilename(
+        "Emi_Galvan_Samsara_(Original_Mix)__17628366__E_Major"
     )
     #expect(bpm == nil)
 }
 
-@Test func detectsMvsepTrailingBPM() {
-    #expect(SourceBPMDetector.scanForBPM(in: "technasia-i-am-somebody-original-mix-125")?.value == 125)
-    #expect(SourceBPMDetector.scanForBPM(in: "tuccillo-unblock-original-mix-120-g-mi")?.value == 120)
-    #expect(SourceBPMDetector.scanForBPM(in: "andrew-meller-bee-original-mix-125-bb-minor")?.value == 125)
+@Test func ignoresNonBeatportFilenames() {
+    // mvsep / dash-separated names are explicitly out of scope.
+    #expect(SourceBPMDetector.scanBeatportFilename("technasia-i-am-somebody-original-mix-125") == nil)
+    #expect(SourceBPMDetector.scanBeatportFilename("andrew-meller-bee-original-mix-125-bb-minor") == nil)
+    // Bare numeric values in the filename without the __BPM__ wrapper are ignored.
+    #expect(SourceBPMDetector.scanBeatportFilename("song_125bpm") == nil)
 }
 
-@Test func rejectsImplausibleTrailingNumber() {
-    // mvsep duplicate-suffix counters like "-1", "-2" must not be read as BPM.
-    #expect(SourceBPMDetector.scanForBPM(in: "andain-beautiful-things-original-mix-1") == nil)
-    // Track-number prefixes shouldn't get picked up as BPM either.
-    #expect(SourceBPMDetector.scanForBPM(in: "01-hermanez-gold-coast-original") == nil)
-}
-
-@Test func walksUpParentDirectoriesForBPM() {
-    // Synthesize the mvsep nested layout: <track>/<run>/vocals.wav
-    let url = URL(fileURLWithPath: "/tmp/mvsep-test/technasia-i-am-somebody-original-mix-125/2025-01-16_all_in_ensemble/vocals.wav")
+@Test func doesNotWalkParentDirectories() {
+    // The detector must look at the file itself, not its containing folder.
+    let url = URL(fileURLWithPath: "/tmp/somefolder-mix-125/vocals.wav")
     let detected = SourceBPMDetector().detect(input: url)
-    #expect(detected?.bpm.value == 125)
-    #expect(detected?.source.hasPrefix("parent dir:") == true)
+    #expect(detected == nil)
 }

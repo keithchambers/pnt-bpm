@@ -73,33 +73,29 @@ Render one target BPM:
 pnt-bpm song.wav --source 120 --target 125
 ```
 
-### Auto-detecting the source BPM
+### Auto-detecting the source BPM (Beatport only)
 
-If you omit `--source`, `pnt-bpm` will try to figure out the source BPM from
-the file itself, in this order:
+If you omit `--source`, `pnt-bpm` will try to read the BPM from a
+Beatport-purchased track in one of two ways:
 
-1. **Embedded metadata** — ID3 `TBPM`, iTunes `tmpo`, and similar tags via
-   AVFoundation. Works on most properly tagged tracks (e.g. Beatport AIFFs
-   with an embedded ID3 chunk, MixedInKey-tagged files, anything with an
-   iTunes-style "tmpo" atom).
-2. **Filename** — Beatport's `..._(Mix)__BPM__Key.aiff` slot, or a trailing
-   `-BPM` / `-BPM-key` token.
-3. **Parent directories** — walks up to three ancestor folders. This is how
-   mvsep.com stem layouts are detected: the per-track folder name carries
-   the BPM (e.g. `andrew-meller-bee-original-mix-125-bb-minor/`) even
-   though the stem WAVs themselves don't.
+1. **ID3 `TBPM` frame** embedded in the file's metadata (Beatport
+   typically writes this as an `id3 ` chunk at the tail of the AIFF, and
+   in the ID3v2 header of the MP3 download).
+2. **Beatport filename slot** — the BPM that sits between double
+   underscores in Beatport's naming convention,
+   `Artist_Title_(Mix)__<BPM>__<Key>.aiff`.
 
 ```sh
-# Source BPM is read from the embedded ID3 TBPM tag:
+# Either the ID3 TBPM frame or the __125__ slot in the filename works:
 pnt-bpm "Andrew_Meller_Bee_(Original_Mix)__125__Bb_Minor.aiff" --target 128
-
-# Source BPM is read from the parent folder name:
-pnt-bpm mvsep-out/andrew-meller-bee-original-mix-125-bb-minor/2025-01-16_all_in_ensemble/vocals.wav --target 128
 ```
 
-Values outside 50–220 BPM are rejected as implausible — this filters out
-Beatport's older 7–8-digit track-IDs and mvsep's `-1`, `-2` duplicate
-suffixes. If detection fails, pass `--source <BPM>` explicitly.
+Values outside 50–220 BPM are rejected — this filters out Beatport's
+older 7–8-digit track-IDs that occasionally appear in the same slot
+(`__17628366__`). Nothing else is attempted: there is no parent-directory
+walk, no generic metadata-key search, and no audio-content analysis. If
+neither source is present, `pnt-bpm` errors out and you should pass
+`--source <BPM>` explicitly.
 
 Render multiple target BPMs:
 
